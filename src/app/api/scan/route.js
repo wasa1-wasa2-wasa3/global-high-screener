@@ -116,6 +116,24 @@ async function batchFetchWithConcurrency(symbols, crumb, cookie) {
   return results;
 }
 
+// ─── セクター正規化 ────────────────────────────────────────────────────────
+
+const SECTOR_NORM = {
+  'Communication Services': 'Communication',
+  'Consumer Discretionary': 'Consumer Cyclical',
+  'Consumer Defensive':     'Consumer Staples',
+  'Financial Services':     'Financial',
+  'Finance':                'Financial',
+  'Health Care':            'Healthcare',
+  'Basic Materials':        'Materials',
+  'Industrial':             'Industrials',
+};
+
+function normalizeSector(s) {
+  if (!s || s === '—') return '—';
+  return SECTOR_NORM[s] ?? s;
+}
+
 // ─── Quote マッピング ──────────────────────────────────────────────────────
 
 function mapQuote(q, meta) {
@@ -134,7 +152,7 @@ function mapQuote(q, meta) {
   const row = {
     ticker:       q.symbol,
     name:         q.shortName || q.longName || q.symbol,
-    sector:       meta?.sector || q.sector || '—',
+    sector:       normalizeSector(meta?.sector || q.sector),
     price,
     week52High,
     week52Low:    q.fiftyTwoWeekLow || 0,

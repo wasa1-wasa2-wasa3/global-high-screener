@@ -278,7 +278,15 @@ export default function Page() {
     large: { min: 1e11, max: Infinity },
   };
   const { min: capMin, max: capMax } = capRanges[capFilter] || capRanges.all;
-  const sectors = ['all', ...new Set(scanResults.map(r => r.sector).filter(Boolean).sort())];
+
+  const sectorCounts = {};
+  scanResults.forEach(r => {
+    if (r.sector && r.sector !== '—') sectorCounts[r.sector] = (sectorCounts[r.sector] || 0) + 1;
+  });
+  const hotSector = Object.keys(sectorCounts).length
+    ? Object.entries(sectorCounts).sort((a, b) => b[1] - a[1])[0][0]
+    : null;
+  const sectors = ['all', ...new Set(scanResults.map(r => r.sector).filter(s => s && s !== '—').sort())];
 
   const filteredRows = scanResults.filter(r =>
     (r.marketCap || 0) >= capMin &&
@@ -418,7 +426,13 @@ export default function Page() {
         {sectors.length > 2 && (
           <select value={sectorFilter} onChange={e => setSectorFilter(e.target.value)}
             style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 13, cursor: 'pointer', minHeight: 44 }}>
-            {sectors.map(s => <option key={s} value={s}>{s === 'all' ? 'セクター: すべて' : s}</option>)}
+            {sectors.map(s => (
+            <option key={s} value={s}>
+              {s === 'all'
+                ? `セクター: すべて${hotSector ? ` (🔥${hotSector})` : ''}`
+                : `${s === hotSector ? '🔥 ' : ''}${s}${sectorCounts[s] ? ` (${sectorCounts[s]})` : ''}`}
+            </option>
+          ))}
           </select>
         )}
       </div>
