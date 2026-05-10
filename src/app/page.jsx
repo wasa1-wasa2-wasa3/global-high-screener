@@ -190,7 +190,7 @@ export default function Page() {
   const [isMobile, setIsMobile]       = useState(false);
   const [scannedAt, setScannedAt]     = useState(null);
   const [scannedCount, setScannedCount] = useState(null);
-  const [minMktCap, setMinMktCap]     = useState('1B');
+  const [capFilter, setCapFilter]     = useState('small');
   const [sectorFilter, setSectorFilter] = useState('all');
   const [errorMsg, setErrorMsg]       = useState(null);
 
@@ -244,12 +244,18 @@ export default function Page() {
     localStorage.setItem(WATCH_KEY, JSON.stringify(next));
   }
 
-  const capMap = { all: 0, '1B': 1e9, '10B': 1e10, '100B': 1e11 };
-  const minCap = capMap[minMktCap] || 0;
+  const capRanges = {
+    all:   { min: 0,    max: Infinity },
+    small: { min: 1e9,  max: 1e10 },
+    mid:   { min: 1e10, max: 1e11 },
+    large: { min: 1e11, max: Infinity },
+  };
+  const { min: capMin, max: capMax } = capRanges[capFilter] || capRanges.all;
   const sectors = ['all', ...new Set(scanResults.map(r => r.sector).filter(Boolean).sort())];
 
   const filteredRows = scanResults.filter(r =>
-    (r.marketCap || 0) >= minCap &&
+    (r.marketCap || 0) >= capMin &&
+    (r.marketCap || 0) < capMax &&
     (sectorFilter === 'all' || r.sector === sectorFilter)
   );
   const watchRows    = Object.values(watchlist);
@@ -295,12 +301,12 @@ export default function Page() {
           {loading ? '⏳ スキャン中 (10〜20秒)...' : '🔍 52週高値スキャン実行'}
         </button>
         {scannedAt && <span style={{ fontSize: 12, color: '#888' }}>最終: {new Date(scannedAt).toLocaleString('ja-JP')}</span>}
-        <select value={minMktCap} onChange={e => setMinMktCap(e.target.value)}
+        <select value={capFilter} onChange={e => setCapFilter(e.target.value)}
           style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 13, cursor: 'pointer', minHeight: 44 }}>
           <option value="all">規模: すべて</option>
-          <option value="1B">時価総額 $1B以上</option>
-          <option value="10B">時価総額 $10B以上</option>
-          <option value="100B">時価総額 $100B以上</option>
+          <option value="small">Small ($1B–$10B) 原石</option>
+          <option value="mid">Mid ($10B–$100B) 本命</option>
+          <option value="large">Large ($100B+) 主力株</option>
         </select>
         {sectors.length > 2 && (
           <select value={sectorFilter} onChange={e => setSectorFilter(e.target.value)}
