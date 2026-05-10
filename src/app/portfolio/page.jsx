@@ -9,6 +9,7 @@ const GOLD  = '#C9A84C';
 const GOLD2 = '#F0C040';
 
 const PORTFOLIO_KEY = 'us_portfolio_v1';
+const LAST_SCAN_KEY = 'us_scan_last_v1';
 const LIST_TYPE     = 'us_portfolio';
 
 function navStyle(active) {
@@ -44,6 +45,10 @@ export default function PortfolioPage() {
   const [usdJpy, setUsdJpy]           = useState(null);
   const [isMobile, setIsMobile]       = useState(false);
   const [copiedTicker, setCopiedTicker] = useState(null);
+  const [breakoutAlerts, setBreakoutAlerts] = useState([]);
+  const [entryPopup, setEntryPopup]   = useState(null);
+  const [popupShares, setPopupShares] = useState('');
+  const [popupCost, setPopupCost]     = useState('');
   const userRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -62,6 +67,18 @@ export default function PortfolioPage() {
     try {
       const stored = localStorage.getItem(PORTFOLIO_KEY);
       if (stored) setItems(JSON.parse(stored));
+    } catch {}
+    try {
+      const scanData = localStorage.getItem(LAST_SCAN_KEY);
+      if (scanData) {
+        const { rows } = JSON.parse(scanData);
+        const alerts = (rows || []).filter(r =>
+          (r.volRatio ?? 0) >= 3 &&
+          parseFloat(r.high52Pct ?? '-99') >= -1 &&
+          (r.dayChangePct ?? 0) > 0
+        );
+        setBreakoutAlerts(alerts);
+      }
     } catch {}
   }, []);
 
@@ -200,6 +217,42 @@ export default function PortfolioPage() {
     setScanning(false);
   }
 
+  function openEntryPopup(item) {
+    setEntryPopup(item);
+    setPopupShares('');
+    setPopupCost(item.price != null ? String(item.price) : '');
+  }
+
+  async function addFromBreakout(item, holdingShares, avgCost) {
+    const t = item.ticker;
+    if (items[t]) return;
+    const entry = {
+      ticker: t,
+      name: item.name ?? null,
+      holdingShares: holdingShares || null,
+      avgCost: avgCost || null,
+      price: item.price ?? null,
+      week52High: item.week52High ?? null,
+      high52Pct: item.high52Pct ?? null,
+      volRatio: item.volRatio ?? null,
+      dayChangePct: item.dayChangePct ?? null,
+      marketCap: item.marketCap ?? null,
+      score: item.score ?? null,
+      savedAt: Date.now(),
+    };
+    const next = { ...items, [t]: entry };
+    persistLocal(next);
+    setEntryPopup(null);
+    const u = userRef.current;
+    if (u) {
+      const { ticker, name, savedAt: _s, ...data } = entry;
+      await supabase.from('watchlist').upsert(
+        { user_id: u.id, list_type: LIST_TYPE, ticker, name, data, saved_at: new Date().toISOString() },
+        { onConflict: 'user_id,list_type,ticker' }
+      );
+    }
+  }
+
   function copyStopOrder(ticker, shares, stopPrice, isOtokoKabu) {
     const priceStr = isOtokoKabu ? 'OTOKO-KABU (no stop)' : fmtUSD(stopPrice);
     navigator.clipboard.writeText(`${ticker} / ${shares} shares / Stop @ ${priceStr}`).catch(() => {});
@@ -259,6 +312,101 @@ export default function PortfolioPage() {
         </nav>
         <AuthButton />
       </div>
+
+      {/* Breakout alert banner */}
+      {breakoutAlerts.length > 0 && (
+        <div style={{ marginBottom: 14, padding: '14px 16px', background: 'linear-gradient(135deg,#0A1628,#1E3A5F)', border: `2px solid ${GOLD}`, borderRadius: 12 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: GOLD, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+            🚨 ブレイクアウト発生 — 最新スキャンより
+            <span style={{ fontSize: 11, fontWeight: 500, color: '#C9A84C', background: 'rgba(201,168,76,0.15)', padding: '1px 8px', borderRadius: 10, border: `1px solid ${GOLD}` }}>
+              {breakoutAlerts.length}件
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {breakoutAlerts.map(item => {
+              const alreadyIn = !!items[item.ticker];
+              const pct52 = parseFloat(item.high52Pct ?? '0');
+              return (
+                <button key={item.ticker}
+                  onClick={() => !alreadyIn && openEntryPopup(item)}
+                  style={{
+                    padding: '7px 14px', borderRadius: 8, border: 'none', cursor: alreadyIn ? 'default' : 'pointer',
+                    background: alreadyIn ? 'rgba(255,255,255,0.08)' : `linear-gradient(135deg,${GOLD},${GOLD2})`,
+                    color: alreadyIn ? '#64748B' : NAVY,
+                    fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
+                  }}>
+                  {item.ticker}
+                  <span style={{ marginLeft: 5, fontWeight: 400 }}>
+                    {item.name?.slice(0, 10)}
+                  </span>
+                  <span style={{ marginLeft: 6, opacity: 0.85 }}>
+                    🔥{item.volRatio?.toFixed(1)}x
+                  </span>
+                  <span style={{ marginLeft: 4, opacity: 0.85 }}>
+                    {pct52 >= 0 ? '+' : ''}{pct52.toFixed(1)}%
+                  </span>
+                  {alreadyIn
+                    ? <span style={{ marginLeft: 6, fontSize: 11 }}>✓ 保有中</span>
+                    : <span style={{ marginLeft: 6, fontSize: 11 }}>→ エントリー</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Entry popup */}
+      {entryPopup && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 16px' }}>
+          <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', maxWidth: 380, width: '100%', boxShadow: '0 12px 50px rgba(0,0,0,0.3)' }}>
+            <div style={{ background: NAVY, padding: '18px 22px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, letterSpacing: 2, marginBottom: 4 }}>BREAKOUT ENTRY</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: '#fff' }}>{entryPopup.ticker}</div>
+                <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 2 }}>{entryPopup.name}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: GOLD }}>{fmtUSD(entryPopup.price)}</div>
+                <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                  🔥 出来高 {entryPopup.volRatio?.toFixed(1)}x ·
+                  52W {parseFloat(entryPopup.high52Pct ?? '0') >= 0 ? '+' : ''}{parseFloat(entryPopup.high52Pct ?? '0').toFixed(1)}%
+                </div>
+              </div>
+            </div>
+            <div style={{ padding: '20px 22px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 18 }}>
+                <label style={{ fontSize: 12, color: '#64748B' }}>保有数量（株）
+                  <input type="number" min="0" value={popupShares} onChange={e => setPopupShares(e.target.value)}
+                    style={{ display: 'block', width: '100%', marginTop: 5, padding: '10px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 15, boxSizing: 'border-box' }} />
+                </label>
+                <label style={{ fontSize: 12, color: '#64748B' }}>取得単価 (USD)
+                  <input type="number" min="0" step="0.01" value={popupCost} onChange={e => setPopupCost(e.target.value)}
+                    style={{ display: 'block', width: '100%', marginTop: 5, padding: '10px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 15, boxSizing: 'border-box' }} />
+                </label>
+              </div>
+              <div style={{ background: '#F8FAFC', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: '#64748B' }}>
+                <div style={{ fontWeight: 600, color: '#374151', marginBottom: 4 }}>エントリー後の損切り・回収ライン（目安）</div>
+                {popupCost ? (
+                  <>
+                    <div>損切り <strong style={{ color: '#DC2626' }}>{fmtUSD(Number(popupCost) * (1 + stopLoss / 100))}</strong> <span style={{ color: '#94A3B8' }}>(× {(1 + stopLoss / 100).toFixed(2)})</span></div>
+                    <div>元本回収 <strong style={{ color: '#059669' }}>{fmtUSD(Number(popupCost) * (1 + takeProfit / 100))}</strong> <span style={{ color: '#94A3B8' }}>(× {(1 + takeProfit / 100).toFixed(2)})</span></div>
+                  </>
+                ) : <span>取得単価を入力すると表示されます</span>}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setEntryPopup(null)}
+                  style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid #E2E8F0', background: '#fff', cursor: 'pointer', fontSize: 13, color: '#64748B' }}>
+                  キャンセル
+                </button>
+                <button onClick={() => addFromBreakout(entryPopup, Number(popupShares) || null, Number(popupCost) || null)}
+                  style={{ flex: 2, padding: '10px', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${GOLD},${GOLD2})`, color: NAVY, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                  ⚡ エントリー確定
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Guidance banner */}
       {guidanceMsg && (
