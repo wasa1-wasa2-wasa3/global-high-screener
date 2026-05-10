@@ -46,7 +46,7 @@ function high52Color(pct) {
 }
 
 // ─── Desktop row ───────────────────────────────────────────────────────────
-function ScanRow({ row, rank, watchlist, onWatch, usdJpy }) {
+function ScanRow({ row, rank, watchlist, onWatch, usdJpy, onEnrich }) {
   const signals   = getSignals(row);
   const isWatched = !!watchlist[row.ticker];
   const pct       = parseFloat(row.high52Pct);
@@ -61,10 +61,14 @@ function ScanRow({ row, rank, watchlist, onWatch, usdJpy }) {
         </button>
       </td>
       <td style={{ padding: '8px 10px' }}>
-        <a href={`https://finance.yahoo.com/quote/${row.ticker}`} target="_blank" rel="noopener noreferrer"
-          style={{ color: NAVY, fontWeight: 700, textDecoration: 'none', fontSize: 14 }}>
-          {row.ticker}
-        </a>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <button onClick={() => onEnrich(row)}
+            style={{ color: NAVY, fontWeight: 700, fontSize: 14, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', textDecorationStyle: 'dotted' }}>
+            {row.ticker}
+          </button>
+          <a href={`https://finance.yahoo.com/quote/${row.ticker}`} target="_blank" rel="noopener noreferrer"
+            style={{ fontSize: 10, color: '#94A3B8', textDecoration: 'none' }}>↗</a>
+        </div>
         <div style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>{row.name?.slice(0, 22)}</div>
         <div style={{ fontSize: 10, color: '#94A3B8' }}>{row.sector}</div>
       </td>
@@ -114,7 +118,7 @@ function MetricCell({ label, value, color = '#374151', bg = '#F8FAFC' }) {
   );
 }
 
-function ScanCard({ row, watchlist, onWatch, usdJpy }) {
+function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich }) {
   const signals   = getSignals(row);
   const isWatched = !!watchlist[row.ticker];
   const pct       = parseFloat(row.high52Pct);
@@ -125,10 +129,12 @@ function ScanCard({ row, watchlist, onWatch, usdJpy }) {
       <div style={{ background: NAVY, padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3, flexWrap: 'wrap' }}>
-            <a href={`https://finance.yahoo.com/quote/${row.ticker}`} target="_blank" rel="noopener noreferrer"
-              style={{ color: GOLD, fontWeight: 700, fontSize: 19, textDecoration: 'none' }}>
+            <button onClick={() => onEnrich(row)}
+              style={{ color: GOLD, fontWeight: 700, fontSize: 19, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', textDecorationStyle: 'dotted', textDecorationColor: GOLD }}>
               {row.ticker}
-            </a>
+            </button>
+            <a href={`https://finance.yahoo.com/quote/${row.ticker}`} target="_blank" rel="noopener noreferrer"
+              style={{ fontSize: 11, color: '#64748B', textDecoration: 'none' }}>↗YF</a>
             <span style={{ background: `linear-gradient(135deg,${GOLD},${GOLD2})`, color: NAVY, padding: '2px 8px', borderRadius: 10, fontWeight: 700, fontSize: 12 }}>
               {row.score}pt
             </span>
@@ -193,6 +199,9 @@ export default function Page() {
   const [capFilter, setCapFilter]     = useState('small');
   const [sectorFilter, setSectorFilter] = useState('all');
   const [errorMsg, setErrorMsg]       = useState(null);
+  const [enrichRow, setEnrichRow]     = useState(null);
+  const [enrichData, setEnrichData]   = useState(null);
+  const [enrichLoading, setEnrichLoading] = useState(false);
 
   useEffect(() => {
     if (!localStorage.getItem(GUIDE_KEY)) window.location.replace('/guide');
@@ -236,6 +245,24 @@ export default function Page() {
     }
   }
 
+  async function openEnrich(row) {
+    setEnrichRow(row);
+    setEnrichData(null);
+    setEnrichLoading(true);
+    try {
+      const res = await fetch('/api/gemini-enrich', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticker: row.ticker, name: row.name }),
+      });
+      const data = await res.json();
+      setEnrichData(data);
+    } catch (e) {
+      setEnrichData({ error: e.message });
+    }
+    setEnrichLoading(false);
+  }
+
   function toggleWatch(row) {
     const next = { ...watchlist };
     if (next[row.ticker]) { delete next[row.ticker]; }
@@ -272,6 +299,86 @@ export default function Page() {
         </nav>
         <AuthButton />
       </div>
+
+      {/* Gemini enrich popup */}
+      {enrichRow && (
+        <div onClick={() => setEnrichRow(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 16px' }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: '#fff', borderRadius: 18, overflow: 'hidden', maxWidth: 440, width: '100%', boxShadow: '0 16px 60px rgba(0,0,0,0.35)' }}>
+            {/* Header */}
+            <div style={{ background: `linear-gradient(135deg,${NAVY},${NAVY2})`, padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontSize: 10, letterSpacing: 3, color: GOLD, fontWeight: 700, marginBottom: 4 }}>AI ANALYSIS</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>{enrichRow.ticker}</div>
+                <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 2 }}>{enrichRow.name}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: GOLD }}>${enrichRow.price?.toFixed(2)}</div>
+                <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                  {enrichRow.dayChangePct >= 0 ? '+' : ''}{enrichRow.dayChangePct?.toFixed(2)}% 前日比
+                </div>
+                <a href={`https://finance.yahoo.com/quote/${enrichRow.ticker}`} target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize: 10, color: '#64748B' }}>Yahoo Finance ↗</a>
+              </div>
+            </div>
+            {/* Body */}
+            <div style={{ padding: '20px 22px' }}>
+              {enrichLoading ? (
+                <div style={{ textAlign: 'center', padding: '32px 0', color: '#94A3B8' }}>
+                  <div style={{ fontSize: 28, marginBottom: 10 }}>✨</div>
+                  <div style={{ fontSize: 13 }}>Gemini が分析中...</div>
+                </div>
+              ) : enrichData?.error ? (
+                <div style={{ color: '#DC2626', fontSize: 13, padding: '16px 0' }}>⚠️ {enrichData.error}</div>
+              ) : enrichData ? (
+                <>
+                  {/* 新高値付近の理由 */}
+                  <div style={{ marginBottom: 18 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: GOLD, marginBottom: 8 }}>
+                      WHY AT 52W HIGH
+                    </div>
+                    <div style={{ background: '#F8FAFC', borderRadius: 10, padding: '12px 16px' }}>
+                      {(enrichData.reason || '').split('\n').map((line, i) => (
+                        <div key={i} style={{ fontSize: 13, color: '#1E293B', lineHeight: 1.7, display: 'flex', gap: 8 }}>
+                          <span style={{ color: GOLD, fontWeight: 700, flexShrink: 0 }}>{i + 1}.</span>
+                          <span>{line}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {/* 決算評価 */}
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#64748B', marginBottom: 8 }}>
+                      LATEST EARNINGS
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      {enrichData.earningsYoY != null && (
+                        <div style={{ background: enrichData.earningsYoY >= 0 ? '#ECFDF5' : '#FEF2F2', borderRadius: 10, padding: '10px 16px', flex: 1, minWidth: 100 }}>
+                          <div style={{ fontSize: 10, color: '#64748B', marginBottom: 4 }}>売上 YoY</div>
+                          <div style={{ fontSize: 22, fontWeight: 700, color: enrichData.earningsYoY >= 0 ? '#059669' : '#DC2626' }}>
+                            {enrichData.earningsYoY >= 0 ? '+' : ''}{enrichData.earningsYoY.toFixed(1)}%
+                          </div>
+                        </div>
+                      )}
+                      {enrichData.earningsEval && (
+                        <div style={{ background: '#F8FAFC', borderRadius: 10, padding: '10px 16px', flex: 2 }}>
+                          <div style={{ fontSize: 10, color: '#64748B', marginBottom: 4 }}>評価</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#1E293B', lineHeight: 1.5 }}>{enrichData.earningsEval}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : null}
+              <button onClick={() => setEnrichRow(null)}
+                style={{ marginTop: 20, width: '100%', padding: '10px', borderRadius: 8, border: '1px solid #E2E8F0', background: '#fff', cursor: 'pointer', fontSize: 13, color: '#64748B' }}>
+                閉じる
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hero */}
       <div style={{ background: `linear-gradient(160deg,${NAVY} 0%,${NAVY2} 100%)`, borderRadius: 16, padding: isMobile ? '20px 18px' : '26px 32px', marginBottom: 20, color: '#fff', position: 'relative', overflow: 'hidden' }}>
@@ -348,7 +455,7 @@ export default function Page() {
       ) : isMobile ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {displayRows.map(r => (
-            <ScanCard key={r.ticker} row={r} watchlist={watchlist} onWatch={toggleWatch} usdJpy={usdJpy} />
+            <ScanCard key={r.ticker} row={r} watchlist={watchlist} onWatch={toggleWatch} usdJpy={usdJpy} onEnrich={openEnrich} />
           ))}
         </div>
       ) : (
@@ -363,7 +470,7 @@ export default function Page() {
             </thead>
             <tbody>
               {displayRows.map((r, i) => (
-                <ScanRow key={r.ticker} row={r} rank={i + 1} watchlist={watchlist} onWatch={toggleWatch} usdJpy={usdJpy} />
+                <ScanRow key={r.ticker} row={r} rank={i + 1} watchlist={watchlist} onWatch={toggleWatch} usdJpy={usdJpy} onEnrich={openEnrich} />
               ))}
             </tbody>
           </table>
