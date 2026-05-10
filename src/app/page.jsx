@@ -12,6 +12,7 @@ const GOLD2 = '#F0C040';
 const WATCH_KEY     = 'us_watchlist_v1';
 const LAST_SCAN_KEY = 'us_scan_last_v1';
 const GUIDE_KEY     = 'guide_seen_us_v1';
+const FILTER_KEY    = 'us_filter_v1';
 const LIST_TYPE     = 'us_scan';
 
 function fmtPrice(v) {
@@ -227,8 +228,8 @@ export default function Page() {
   const [isMobile, setIsMobile]       = useState(false);
   const [scannedAt, setScannedAt]     = useState(null);
   const [scannedCount, setScannedCount] = useState(null);
-  const [capFilter, setCapFilter]     = useState('small');
-  const [sectorFilter, setSectorFilter] = useState('all');
+  const [capFilter, setCapFilter]     = useState(() => { try { return JSON.parse(localStorage.getItem(FILTER_KEY))?.cap || 'small'; } catch { return 'small'; } });
+  const [sectorFilter, setSectorFilter] = useState(() => { try { return JSON.parse(localStorage.getItem(FILTER_KEY))?.sector || 'all'; } catch { return 'all'; } });
   const [errorMsg, setErrorMsg]       = useState(null);
   const [enrichRow, setEnrichRow]     = useState(null);
   const [enrichData, setEnrichData]   = useState(null);
@@ -257,6 +258,10 @@ export default function Page() {
   useEffect(() => {
     fetch('/api/fx').then(r => r.json()).then(d => { if (d.rate) setUsdJpy(d.rate); }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem(FILTER_KEY, JSON.stringify({ cap: capFilter, sector: sectorFilter })); } catch {}
+  }, [capFilter, sectorFilter]);
 
   async function runScan() {
     setLoading(true);
