@@ -24,9 +24,10 @@ export function getSignals(row) {
     }
   }
 
-  // ✨ High dividend (US: 2.5%+), skip if flagged as special dividend anomaly
-  if ((row.dividendYield || 0) >= 2.5 && !row.specialDividend) {
-    signals.push({ type: 'dividend', icon: '✨', label: `配当${row.dividendYield.toFixed(1)}%`, color: '#059669' });
+  // ✨ High dividend (US: 2.5%–25%), >25% = special dividend anomaly
+  const dy = row.dividendYield || 0;
+  if (dy >= 2.5 && dy <= 25 && !row.specialDividend) {
+    signals.push({ type: 'dividend', icon: '✨', label: `配当${dy.toFixed(1)}%`, color: '#059669' });
   }
 
   // ⚠️ Overheated: >30% above 50-day MA
