@@ -24,8 +24,8 @@ export function getSignals(row) {
     }
   }
 
-  // ✨ High dividend (US: 2.5%+)
-  if ((row.dividendYield || 0) >= 2.5) {
+  // ✨ High dividend (US: 2.5%+), skip if flagged as special dividend anomaly
+  if ((row.dividendYield || 0) >= 2.5 && !row.specialDividend) {
     signals.push({ type: 'dividend', icon: '✨', label: `配当${row.dividendYield.toFixed(1)}%`, color: '#059669' });
   }
 

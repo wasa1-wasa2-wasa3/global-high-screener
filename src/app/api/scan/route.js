@@ -163,9 +163,13 @@ function mapQuote(q, meta) {
     dayChangePct: Math.round((q.regularMarketChangePercent || 0) * 100) / 100,
     marketCap:    q.marketCap || 0,
     pe:           q.trailingPE || null,
-    dividendYield: q.trailingAnnualDividendYield
-      ? Math.round(q.trailingAnnualDividendYield * 1000) / 10
-      : 0,
+    // trailingAnnualDividendYield >25% = special dividend anomaly; suppress and flag
+    dividendYield: (q.trailingAnnualDividendYield || 0) > 0.25
+      ? 0
+      : q.trailingAnnualDividendYield
+        ? Math.round(q.trailingAnnualDividendYield * 1000) / 10
+        : 0,
+    specialDividend: (q.trailingAnnualDividendYield || 0) > 0.25,
     ma50:    q.fiftyDayAverage || null,
     ma50Dev,
     earningsDate: q.earningsTimestamp

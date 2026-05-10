@@ -63,7 +63,7 @@ function ScoreBadge({ score }) {
     </div>
   );
 }
-function SignalBadges({ score, signals }) {
+function SignalBadges({ score, signals, specialDividend }) {
   const buy = hasBuySignal(score, signals);
   return (
     <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -82,6 +82,11 @@ function SignalBadges({ score, signals }) {
           {s.type === 'overheated' ? '🟡 STAY' : `${s.icon} ${s.label}`}
         </span>
       ))}
+      {specialDividend && (
+        <span title="過去12ヶ月に特別配当が含まれるため配当利回りを除外しています" style={{ fontSize: 11, padding: '2px 6px', borderRadius: 5, background: '#FEF2F2', color: '#9CA3AF', fontWeight: 500, whiteSpace: 'nowrap', cursor: 'help', textDecoration: 'line-through' }}>
+          📌 特配除外
+        </span>
+      )}
     </div>
   );
 }
@@ -133,7 +138,7 @@ function ScanRow({ row, rank, watchlist, onWatch, usdJpy, onEnrich }) {
       <td style={{ padding: '8px 10px', fontSize: 12, color: '#64748B' }}>{fmtMktCap(row.marketCap)}</td>
       <td style={{ padding: '8px 10px', fontSize: 12, color: '#64748B' }}>{row.pe ? row.pe.toFixed(1) : '—'}</td>
       <td style={{ padding: '8px 10px' }}>
-        <SignalBadges score={row.score} signals={signals} />
+        <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} />
       </td>
       <td style={{ padding: '8px 10px', textAlign: 'center' }}>
         <ScoreBadge score={row.score} />
@@ -206,7 +211,7 @@ function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich }) {
           <MetricCell label="時価総額" value={fmtMktCap(row.marketCap)} />
           <MetricCell label="P/E" value={row.pe ? row.pe.toFixed(1) : '—'} />
         </div>
-        <SignalBadges score={row.score} signals={signals} />
+        <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} />
       </div>
     </div>
   );
