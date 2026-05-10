@@ -45,22 +45,83 @@ function high52Color(pct) {
   if (pct >= -3)  return { color: '#065F46', bg: '#ECFDF5' };
   return { color: '#64748B', bg: '#F8FAFC' };
 }
-function scoreColor(score) {
-  if (score >= 70) return { color: '#15803D', bg: '#DCFCE7', bar: '#16A34A' };
-  if (score >= 50) return { color: '#D97706', bg: '#FEF3C7', bar: '#F59E0B' };
-  return { color: '#64748B', bg: '#F1F5F9', bar: '#94A3B8' };
+const RANK_DEFS = [
+  { rank: 'S', range: '80–100', label: 'Strong Buy',   color: '#92400E', bg: '#FEF3C7', border: '#F59E0B', bar: '#F59E0B' },
+  { rank: 'A', range: '70–79',  label: 'Buy / Entry',  color: '#15803D', bg: '#DCFCE7', border: '#86EFAC', bar: '#16A34A' },
+  { rank: 'B', range: '60–69',  label: 'Watch / Hold', color: '#1D4ED8', bg: '#EFF6FF', border: '#93C5FD', bar: '#3B82F6' },
+  { rank: 'C', range: '50–59',  label: 'Neutral',      color: '#475569', bg: '#F1F5F9', border: '#CBD5E1', bar: '#94A3B8' },
+  { rank: 'D', range: '<50',    label: 'Ignore',       color: '#94A3B8', bg: '#F8FAFC', border: '#E2E8F0', bar: '#CBD5E1' },
+];
+const SCORE_BREAKDOWN = [
+  { label: '52W高値近接',    max: 40, desc: '高値まで0% → +40pt' },
+  { label: '出来高急増',     max: 30, desc: '4x以上 → +30pt'    },
+  { label: '前日上昇モメンタム', max: 20, desc: '+7%以上 → +20pt'  },
+  { label: '時価総額信頼度', max: 10, desc: '$1T超 → +10pt'     },
+];
+function scoreRank(score) {
+  return RANK_DEFS.find(r => {
+    if (r.rank === 'S') return score >= 80;
+    if (r.rank === 'A') return score >= 70;
+    if (r.rank === 'B') return score >= 60;
+    if (r.rank === 'C') return score >= 50;
+    return true;
+  });
 }
 function hasBuySignal(score, signals) {
   return score >= 70 && !signals.some(s => s.type === 'overheated');
 }
 function ScoreBadge({ score }) {
-  const sc = scoreColor(score);
+  const r = scoreRank(score);
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-      <span style={{ fontSize: 13, fontWeight: 700, color: sc.color }}>{score}</span>
-      <div style={{ width: 44, height: 5, background: '#E2E8F0', borderRadius: 3, overflow: 'hidden' }}>
-        <div style={{ width: `${Math.min(score, 100)}%`, height: '100%', background: sc.bar, borderRadius: 3 }} />
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+      <span style={{ fontSize: 11, fontWeight: 800, background: r.bg, color: r.color, border: `1px solid ${r.border}`, padding: '2px 6px', borderRadius: 5, letterSpacing: 0.5, lineHeight: 1 }}>
+        {r.rank}
+      </span>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: r.color, lineHeight: 1 }}>{score}</span>
+        <div style={{ width: 36, height: 4, background: '#E2E8F0', borderRadius: 2, overflow: 'hidden' }}>
+          <div style={{ width: `${Math.min(score, 100)}%`, height: '100%', background: r.bar, borderRadius: 2 }} />
+        </div>
       </div>
+    </div>
+  );
+}
+function ScoreHeaderPopover() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 5 }}
+      onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <span>スコア</span>
+      <span style={{ width: 15, height: 15, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: 9, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'help', border: '1px solid rgba(255,255,255,0.35)', flexShrink: 0 }}>i</span>
+      {open && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 10px)', right: 0, zIndex: 300, width: 340, background: '#fff', borderRadius: 14, boxShadow: '0 8px 40px rgba(0,0,0,0.2)', border: '1px solid #E2E8F0', overflow: 'hidden', color: '#111' }}>
+          <div style={{ background: `linear-gradient(135deg,${NAVY},${NAVY2})`, padding: '12px 16px' }}>
+            <div style={{ fontSize: 9, letterSpacing: 3, color: GOLD, fontWeight: 700 }}>SCORE DEFINITION</div>
+            <div style={{ fontSize: 13, color: '#fff', fontWeight: 600, marginTop: 2 }}>スコアとランクの定義</div>
+          </div>
+          <div style={{ padding: '10px 16px 4px' }}>
+            {RANK_DEFS.map((r, i) => (
+              <div key={r.rank} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: i < RANK_DEFS.length - 1 ? '1px solid #F1F5F9' : 'none' }}>
+                <span style={{ fontSize: 12, fontWeight: 800, background: r.bg, color: r.color, border: `1px solid ${r.border}`, padding: '2px 7px', borderRadius: 5, minWidth: 22, textAlign: 'center' }}>{r.rank}</span>
+                <span style={{ fontSize: 11, color: '#94A3B8', minWidth: 56 }}>{r.range}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: r.color }}>{r.label}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ padding: '8px 16px 14px', borderTop: '1px solid #F1F5F9', marginTop: 4 }}>
+            <div style={{ fontSize: 9, letterSpacing: 2, color: '#94A3B8', fontWeight: 700, marginBottom: 8 }}>SCORE BREAKDOWN（合計 100pt）</div>
+            {SCORE_BREAKDOWN.map(b => (
+              <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ fontSize: 11, color: '#374151', fontWeight: 600 }}>{b.label}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 10, color: '#94A3B8' }}>{b.desc}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: '#92400E', background: '#FEF3C7', padding: '1px 5px', borderRadius: 4 }}>+{b.max}pt</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -175,8 +236,8 @@ function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich }) {
             </button>
             <a href={`https://finance.yahoo.com/quote/${row.ticker}`} target="_blank" rel="noopener noreferrer"
               style={{ fontSize: 11, color: '#64748B', textDecoration: 'none' }}>↗YF</a>
-            <span style={{ background: scoreColor(row.score).bg, color: scoreColor(row.score).color, padding: '2px 8px', borderRadius: 10, fontWeight: 700, fontSize: 12, border: `1px solid ${scoreColor(row.score).bar}` }}>
-              {row.score}pt
+            <span style={{ background: scoreRank(row.score).bg, color: scoreRank(row.score).color, padding: '2px 8px', borderRadius: 10, fontWeight: 700, fontSize: 12, border: `1px solid ${scoreRank(row.score).border}` }}>
+              {scoreRank(row.score).rank} {row.score}
             </span>
             {pct >= 0 && (
               <span style={{ fontSize: 11, background: '#FEF3C7', color: '#92400E', padding: '2px 6px', borderRadius: 6, fontWeight: 700 }}>
@@ -522,9 +583,12 @@ export default function Page() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: NAVY, color: '#fff' }}>
-                {['', 'ティッカー', '価格 (USD)', 'JPY換算', '前日比', '52W高値比', '出来高比', '時価総額', 'P/E', 'シグナル', 'スコア'].map(h => (
+                {['', 'ティッカー', '価格 (USD)', 'JPY換算', '前日比', '52W高値比', '出来高比', '時価総額', 'P/E', 'シグナル'].map(h => (
                   <th key={h} style={{ padding: '10px 10px', textAlign: 'left', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
+                <th style={{ padding: '10px 10px', textAlign: 'left', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>
+                  <ScoreHeaderPopover />
+                </th>
               </tr>
             </thead>
             <tbody>
