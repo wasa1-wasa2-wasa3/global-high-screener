@@ -44,6 +44,47 @@ function high52Color(pct) {
   if (pct >= -3)  return { color: '#065F46', bg: '#ECFDF5' };
   return { color: '#64748B', bg: '#F8FAFC' };
 }
+function scoreColor(score) {
+  if (score >= 70) return { color: '#15803D', bg: '#DCFCE7', bar: '#16A34A' };
+  if (score >= 50) return { color: '#D97706', bg: '#FEF3C7', bar: '#F59E0B' };
+  return { color: '#64748B', bg: '#F1F5F9', bar: '#94A3B8' };
+}
+function hasBuySignal(score, signals) {
+  return score >= 70 && !signals.some(s => s.type === 'overheated');
+}
+function ScoreBadge({ score }) {
+  const sc = scoreColor(score);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+      <span style={{ fontSize: 13, fontWeight: 700, color: sc.color }}>{score}</span>
+      <div style={{ width: 44, height: 5, background: '#E2E8F0', borderRadius: 3, overflow: 'hidden' }}>
+        <div style={{ width: `${Math.min(score, 100)}%`, height: '100%', background: sc.bar, borderRadius: 3 }} />
+      </div>
+    </div>
+  );
+}
+function SignalBadges({ score, signals }) {
+  const buy = hasBuySignal(score, signals);
+  return (
+    <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+      {buy && (
+        <span className="buy-pulse" style={{ fontSize: 11, padding: '3px 8px', borderRadius: 5, background: '#DCFCE7', color: '#15803D', fontWeight: 700, border: '1px solid #86EFAC', whiteSpace: 'nowrap' }}>
+          🟢 BUY
+        </span>
+      )}
+      {signals.map(s => (
+        <span key={s.type} style={{
+          fontSize: 11, padding: '2px 6px', borderRadius: 5, fontWeight: 600, whiteSpace: 'nowrap',
+          ...(s.type === 'overheated'
+            ? { background: '#FEF9C3', color: '#A16207', border: '1px solid #FDE047' }
+            : { background: '#F1F5F9', color: s.color }),
+        }}>
+          {s.type === 'overheated' ? '🟡 STAY' : `${s.icon} ${s.label}`}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 // ─── Desktop row ───────────────────────────────────────────────────────────
 function ScanRow({ row, rank, watchlist, onWatch, usdJpy, onEnrich }) {
@@ -52,8 +93,9 @@ function ScanRow({ row, rank, watchlist, onWatch, usdJpy, onEnrich }) {
   const pct       = parseFloat(row.high52Pct);
   const hc        = high52Color(pct);
 
+  const buy = hasBuySignal(row.score, signals);
   return (
-    <tr style={{ borderBottom: '1px solid #F1F5F9', background: rank % 2 === 0 ? '#F8FAFC' : '#fff' }}>
+    <tr style={{ borderBottom: '1px solid #F1F5F9', background: buy ? (rank % 2 === 0 ? 'rgba(220,252,231,0.55)' : 'rgba(220,252,231,0.3)') : (rank % 2 === 0 ? '#F8FAFC' : '#fff') }}>
       <td style={{ padding: '8px 6px', textAlign: 'center' }}>
         <button onClick={() => onWatch(row)}
           style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: isWatched ? GOLD : '#CBD5E1', padding: 0, minWidth: 32, minHeight: 32 }}>
@@ -91,18 +133,10 @@ function ScanRow({ row, rank, watchlist, onWatch, usdJpy, onEnrich }) {
       <td style={{ padding: '8px 10px', fontSize: 12, color: '#64748B' }}>{fmtMktCap(row.marketCap)}</td>
       <td style={{ padding: '8px 10px', fontSize: 12, color: '#64748B' }}>{row.pe ? row.pe.toFixed(1) : '—'}</td>
       <td style={{ padding: '8px 10px' }}>
-        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-          {signals.map(s => (
-            <span key={s.type} style={{ fontSize: 11, padding: '2px 6px', borderRadius: 5, background: '#F1F5F9', color: s.color, fontWeight: 600, whiteSpace: 'nowrap' }}>
-              {s.icon} {s.label}
-            </span>
-          ))}
-        </div>
+        <SignalBadges score={row.score} signals={signals} />
       </td>
-      <td style={{ padding: '8px 10px' }}>
-        <span style={{ display: 'inline-block', background: `linear-gradient(135deg,${GOLD},${GOLD2})`, color: NAVY, padding: '3px 10px', borderRadius: 12, fontWeight: 700, fontSize: 13 }}>
-          {row.score}
-        </span>
+      <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+        <ScoreBadge score={row.score} />
       </td>
     </tr>
   );
@@ -135,7 +169,7 @@ function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich }) {
             </button>
             <a href={`https://finance.yahoo.com/quote/${row.ticker}`} target="_blank" rel="noopener noreferrer"
               style={{ fontSize: 11, color: '#64748B', textDecoration: 'none' }}>↗YF</a>
-            <span style={{ background: `linear-gradient(135deg,${GOLD},${GOLD2})`, color: NAVY, padding: '2px 8px', borderRadius: 10, fontWeight: 700, fontSize: 12 }}>
+            <span style={{ background: scoreColor(row.score).bg, color: scoreColor(row.score).color, padding: '2px 8px', borderRadius: 10, fontWeight: 700, fontSize: 12, border: `1px solid ${scoreColor(row.score).bar}` }}>
               {row.score}pt
             </span>
             {pct >= 0 && (
@@ -172,15 +206,7 @@ function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich }) {
           <MetricCell label="時価総額" value={fmtMktCap(row.marketCap)} />
           <MetricCell label="P/E" value={row.pe ? row.pe.toFixed(1) : '—'} />
         </div>
-        {signals.length > 0 && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {signals.map(s => (
-              <span key={s.type} style={{ fontSize: 12, padding: '3px 8px', borderRadius: 6, background: '#F1F5F9', color: s.color, fontWeight: 600 }}>
-                {s.icon} {s.label}
-              </span>
-            ))}
-          </div>
-        )}
+        <SignalBadges score={row.score} signals={signals} />
       </div>
     </div>
   );
@@ -298,6 +324,13 @@ export default function Page() {
 
   return (
     <main style={{ maxWidth: 1200, margin: '0 auto', padding: '1.5rem 1rem', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+      <style>{`
+        @keyframes buyPulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(21,128,61,0.45); }
+          50%       { box-shadow: 0 0 0 5px rgba(21,128,61,0); }
+        }
+        .buy-pulse { animation: buyPulse 1.8s ease-in-out infinite; }
+      `}</style>
       {/* Nav */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', rowGap: 8 }}>
         <nav style={{ display: 'flex', gap: 4, background: '#EEF2FF', padding: 4, borderRadius: 10 }}>
