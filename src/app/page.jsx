@@ -304,6 +304,8 @@ export default function Page() {
           <a href="/guide"     style={navStyle(false)}>📖 ガイド</a>
           <a href="/"          style={navStyle(true)} >📈 USスキャン</a>
           <a href="/portfolio" style={navStyle(false)}>📊 ポートフォリオ</a>
+          <a href="https://new-high-screener.vercel.app" target="_blank" rel="noopener noreferrer"
+            style={{ fontSize: 12, padding: '5px 11px', borderRadius: 6, textDecoration: 'none', background: 'rgba(0,0,0,0.06)', color: '#64748B', fontWeight: 600, whiteSpace: 'nowrap', marginLeft: 4 }}>🗾 日本株 ↗</a>
         </nav>
         <AuthButton />
       </div>
