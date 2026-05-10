@@ -189,6 +189,7 @@ export default function Page() {
   const [tab, setTab]                 = useState('scan');
   const [isMobile, setIsMobile]       = useState(false);
   const [scannedAt, setScannedAt]     = useState(null);
+  const [scannedCount, setScannedCount] = useState(null);
   const [minMktCap, setMinMktCap]     = useState('1B');
   const [sectorFilter, setSectorFilter] = useState('all');
   const [errorMsg, setErrorMsg]       = useState(null);
@@ -207,7 +208,7 @@ export default function Page() {
   useEffect(() => {
     try {
       const saved = localStorage.getItem(LAST_SCAN_KEY);
-      if (saved) { const d = JSON.parse(saved); setScanResults(d.rows || []); setScannedAt(d.scannedAt); }
+      if (saved) { const d = JSON.parse(saved); setScanResults(d.rows || []); setScannedAt(d.scannedAt); if (d.scannedCount) setScannedCount(d.scannedCount); }
       const wl = localStorage.getItem(WATCH_KEY);
       if (wl) setWatchlist(JSON.parse(wl));
     } catch {}
@@ -226,7 +227,8 @@ export default function Page() {
       if (data.error) { setErrorMsg(data.error); return; }
       setScanResults(data.rows || []);
       setScannedAt(data.scannedAt);
-      localStorage.setItem(LAST_SCAN_KEY, JSON.stringify({ rows: data.rows, scannedAt: data.scannedAt }));
+      setScannedCount(data.scannedCount || null);
+      localStorage.setItem(LAST_SCAN_KEY, JSON.stringify({ rows: data.rows, scannedAt: data.scannedAt, scannedCount: data.scannedCount }));
     } catch (e) {
       setErrorMsg('スキャンに失敗しました: ' + e.message);
     } finally {
@@ -271,9 +273,9 @@ export default function Page() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
           <div>
             <div style={{ fontSize: 11, letterSpacing: 3, color: GOLD, fontWeight: 700, marginBottom: 6 }}>GLOBAL HIGH SCREENER</div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700 }}>🇺🇸 US 52週高値スキャナー</h1>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700 }}>US 52週高値スキャナー</h1>
             <p style={{ margin: '6px 0 0', fontSize: 13, color: '#94A3B8' }}>
-              Nasdaq / NYSE · {scanResults.length > 0 ? `${scanResults.length}件の候補` : '200銘柄を分析'}
+              Nasdaq / NYSE · {scannedCount ? `${scannedCount.toLocaleString()}銘柄をスキャン` : '最大1,000銘柄をスキャン'}
             </p>
           </div>
           <div style={{ textAlign: isMobile ? 'left' : 'right' }}>

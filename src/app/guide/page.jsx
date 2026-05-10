@@ -112,8 +112,8 @@ export default function GuidePage() {
         <div style={{ position: 'absolute', top: -60, right: -60, width: 240, height: 240, borderRadius: '50%', background: 'rgba(201,168,76,0.1)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', bottom: -80, left: -80, width: 300, height: 300, borderRadius: '50%', background: 'rgba(201,168,76,0.07)', pointerEvents: 'none' }} />
         <div style={{ fontSize: 11, letterSpacing: 4, color: GOLD, fontWeight: 700, marginBottom: 12, position: 'relative' }}>VICTORY FORMULA</div>
-        <div style={{ fontSize: 56, marginBottom: 14, position: 'relative' }}>🇺🇸</div>
-        <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: '#fff', position: 'relative' }}>US株 勝利の方程式</h1>
+        <div style={{ fontSize: 13, letterSpacing: 3, fontWeight: 800, color: '#fff', marginBottom: 10, position: 'relative', background: 'rgba(255,255,255,0.1)', display: 'inline-block', padding: '5px 16px', borderRadius: 20 }}>★ US STOCKS ★</div>
+        <h1 style={{ margin: '8px 0 0', fontSize: 26, fontWeight: 700, color: '#fff', position: 'relative' }}>US株 勝利の方程式</h1>
         <p style={{ margin: '12px 0 0', fontSize: 14, color: '#94A3B8', position: 'relative', lineHeight: 1.7 }}>
           52週高値 × 恩株化戦略で<br />リスクゼロの資産を増やし続ける4ステップ
         </p>
