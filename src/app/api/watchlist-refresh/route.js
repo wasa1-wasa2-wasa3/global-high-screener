@@ -45,8 +45,11 @@ export async function POST(request) {
         dayChangePct: Math.round((q.regularMarketChangePercent || 0) * 100) / 100,
         marketCap:    q.marketCap || 0,
         pe:           q.trailingPE || null,
-        dividendYield: q.trailingAnnualDividendYield
-          ? Math.round(q.trailingAnnualDividendYield * 1000) / 10 : 0,
+        dividendYield: (q.trailingAnnualDividendYield || 0) > 0.25
+          ? 0
+          : q.trailingAnnualDividendYield
+            ? Math.round(q.trailingAnnualDividendYield * 1000) / 10 : 0,
+        specialDividend: (q.trailingAnnualDividendYield || 0) > 0.25,
         ma50Dev:      q.fiftyDayAverage > 0
           ? Math.round((price / q.fiftyDayAverage - 1) * 1000) / 10 : null,
         earningsDate: q.earningsTimestamp

@@ -295,6 +295,8 @@ export default function Page() {
   const [enrichRow, setEnrichRow]     = useState(null);
   const [enrichData, setEnrichData]   = useState(null);
   const [enrichLoading, setEnrichLoading] = useState(false);
+  const [watchRefreshing, setWatchRefreshing] = useState(false);
+  const [watchRefreshedAt, setWatchRefreshedAt] = useState(null);
 
   useEffect(() => {
     if (!localStorage.getItem(GUIDE_KEY)) window.location.replace('/guide');
@@ -366,6 +368,33 @@ export default function Page() {
     else { next[row.ticker] = { ...row, savedAt: new Date().toISOString() }; }
     setWatchlist(next);
     localStorage.setItem(WATCH_KEY, JSON.stringify(next));
+  }
+
+  async function refreshWatchlist() {
+    const tickers = Object.keys(watchlist);
+    if (tickers.length === 0) return;
+    setWatchRefreshing(true);
+    try {
+      const res  = await fetch('/api/watchlist-refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tickers }),
+      });
+      const data = await res.json();
+      if (data.rows) {
+        const fresh = Object.fromEntries(data.rows.map(r => [r.ticker, r]));
+        const next  = Object.fromEntries(
+          Object.entries(watchlist).map(([ticker, saved]) => [
+            ticker,
+            { ...saved, ...(fresh[ticker] || {}), savedAt: saved.savedAt },
+          ])
+        );
+        setWatchlist(next);
+        localStorage.setItem(WATCH_KEY, JSON.stringify(next));
+        setWatchRefreshedAt(new Date().toISOString());
+      }
+    } catch {}
+    setWatchRefreshing(false);
   }
 
   const capRanges = {
@@ -550,7 +579,7 @@ export default function Page() {
       )}
 
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '2px solid #E2E8F0', marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', borderBottom: '2px solid #E2E8F0', marginBottom: 16 }}>
         {[
           ['scan',      `スキャン結果${filteredRows.length > 0 ? ` (${filteredRows.length})` : ''}`],
           ['watchlist', `ウォッチリスト${watchRows.length > 0 ? ` (${watchRows.length})` : ''}`],
@@ -560,7 +589,22 @@ export default function Page() {
             {label}
           </button>
         ))}
+        {tab === 'watchlist' && watchRows.length > 0 && (
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 2 }}>
+            {watchRefreshedAt && (
+              <span style={{ fontSize: 11, color: '#94A3B8' }}>
+                更新: {new Date(watchRefreshedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+            <button onClick={refreshWatchlist} disabled={watchRefreshing}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 8, border: `1px solid ${GOLD}`, background: watchRefreshing ? '#F8FAFC' : '#FFFBEB', color: watchRefreshing ? '#94A3B8' : '#92400E', fontSize: 12, fontWeight: 600, cursor: watchRefreshing ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
+              <span style={{ display: 'inline-block', animation: watchRefreshing ? 'spin 1s linear infinite' : 'none' }}>🔄</span>
+              {watchRefreshing ? '更新中...' : '価格を更新'}
+            </button>
+          </div>
+        )}
       </div>
+      <style>{`.spin-icon { animation: spin 1s linear infinite; } @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
 
       {/* Results */}
       {displayRows.length === 0 ? (
