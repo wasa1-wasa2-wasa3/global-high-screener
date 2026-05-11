@@ -45,6 +45,7 @@ export async function POST(request) {
         dayChangePct: Math.round((q.regularMarketChangePercent || 0) * 100) / 100,
         marketCap:    q.marketCap || 0,
         pe:           q.trailingPE || null,
+        pbr:          q.priceToBook > 0 ? Math.round(q.priceToBook * 100) / 100 : null,
         dividendYield: (q.trailingAnnualDividendYield || 0) > 0.25
           ? 0
           : q.trailingAnnualDividendYield

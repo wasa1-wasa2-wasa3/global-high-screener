@@ -35,5 +35,10 @@ export function getSignals(row) {
     signals.push({ type: 'overheated', icon: '⚠️', label: '過熱(Stay)', color: '#9CA3AF' });
   }
 
+  // 💎 Deep Value: PBR < 1.0 (ROE > 10% is verified in the fundamentals popup)
+  if (row.pbr > 0 && row.pbr < 1.0) {
+    signals.push({ type: 'deepValue', icon: '💎', label: 'DEEP VALUE', color: '#7C3AED' });
+  }
+
   return signals;
 }

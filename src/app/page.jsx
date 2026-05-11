@@ -199,6 +199,11 @@ function ScanRow({ row, rank, watchlist, onWatch, usdJpy, onEnrich }) {
       </td>
       <td style={{ padding: '8px 10px', fontSize: 12, color: '#64748B' }}>{fmtMktCap(row.marketCap)}</td>
       <td style={{ padding: '8px 10px', fontSize: 12, color: '#64748B' }}>{row.pe ? row.pe.toFixed(1) : '—'}</td>
+      <td style={{ padding: '8px 10px', fontSize: 12 }}>
+        {row.pbr != null
+          ? <span style={{ fontWeight: row.pbr < 1.0 ? 700 : 400, color: row.pbr < 1.0 ? '#7C3AED' : '#64748B' }}>{row.pbr.toFixed(2)}</span>
+          : <span style={{ color: '#CBD5E1' }}>—</span>}
+      </td>
       <td style={{ padding: '8px 10px' }}>
         <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} />
       </td>
@@ -272,6 +277,9 @@ function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich }) {
             color={row.volRatio >= 2 ? '#DC2626' : '#374151'} />
           <MetricCell label="時価総額" value={fmtMktCap(row.marketCap)} />
           <MetricCell label="P/E" value={row.pe ? row.pe.toFixed(1) : '—'} />
+          <MetricCell label="PBR" value={row.pbr != null ? row.pbr.toFixed(2) : '—'}
+            color={row.pbr > 0 && row.pbr < 1.0 ? '#7C3AED' : '#374151'}
+            bg={row.pbr > 0 && row.pbr < 1.0 ? '#F5F3FF' : '#F8FAFC'} />
         </div>
         <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} />
       </div>
@@ -294,6 +302,7 @@ export default function Page() {
   const [errorMsg, setErrorMsg]       = useState(null);
   const [enrichRow, setEnrichRow]     = useState(null);
   const [enrichData, setEnrichData]   = useState(null);
+  const [fundData, setFundData]       = useState(null);
   const [enrichLoading, setEnrichLoading] = useState(false);
   const [watchRefreshing, setWatchRefreshing] = useState(false);
   const [watchRefreshedAt, setWatchRefreshedAt] = useState(null);
@@ -347,15 +356,15 @@ export default function Page() {
   async function openEnrich(row) {
     setEnrichRow(row);
     setEnrichData(null);
+    setFundData(null);
     setEnrichLoading(true);
     try {
-      const res = await fetch('/api/gemini-enrich', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticker: row.ticker, name: row.name }),
-      });
-      const data = await res.json();
-      setEnrichData(data);
+      const [geminiRes, fundRes] = await Promise.allSettled([
+        fetch('/api/gemini-enrich', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticker: row.ticker, name: row.name }) }).then(r => r.json()),
+        fetch('/api/fundamentals',  { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticker: row.ticker }) }).then(r => r.json()),
+      ]);
+      setEnrichData(geminiRes.status === 'fulfilled' ? geminiRes.value : { error: geminiRes.reason?.message });
+      if (fundRes.status === 'fulfilled' && !fundRes.value.error) setFundData(fundRes.value);
     } catch (e) {
       setEnrichData({ error: e.message });
     }
@@ -448,7 +457,7 @@ export default function Page() {
         <div onClick={() => setEnrichRow(null)}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 16px' }}>
           <div onClick={e => e.stopPropagation()}
-            style={{ background: '#fff', borderRadius: 18, overflow: 'hidden', maxWidth: 440, width: '100%', boxShadow: '0 16px 60px rgba(0,0,0,0.35)' }}>
+            style={{ background: '#fff', borderRadius: 18, overflow: 'hidden', maxWidth: 440, width: '100%', boxShadow: '0 16px 60px rgba(0,0,0,0.35)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
             {/* Header */}
             <div style={{ background: `linear-gradient(135deg,${NAVY},${NAVY2})`, padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
@@ -466,7 +475,7 @@ export default function Page() {
               </div>
             </div>
             {/* Body */}
-            <div style={{ padding: '20px 22px' }}>
+            <div style={{ padding: '20px 22px', overflowY: 'auto', flex: 1 }}>
               {enrichLoading ? (
                 <div style={{ textAlign: 'center', padding: '32px 0', color: '#94A3B8' }}>
                   <div style={{ fontSize: 28, marginBottom: 10 }}>✨</div>
@@ -491,7 +500,7 @@ export default function Page() {
                     </div>
                   </div>
                   {/* 決算評価 */}
-                  <div>
+                  <div style={{ marginBottom: fundData ? 18 : 0 }}>
                     <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#64748B', marginBottom: 8 }}>
                       LATEST EARNINGS
                     </div>
@@ -512,6 +521,59 @@ export default function Page() {
                       )}
                     </div>
                   </div>
+                  {/* 経営実態 */}
+                  {fundData && (
+                    <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: 16 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#7C3AED', marginBottom: 10 }}>FUNDAMENTALS — 経営実態</div>
+                      {/* DEEP VALUE 確認バッジ */}
+                      {enrichRow.pbr > 0 && enrichRow.pbr < 1.0 && fundData.roe != null && fundData.roe > 10.0 && (
+                        <div style={{ background: 'linear-gradient(135deg,#EDE9FE,#F5F3FF)', border: '1px solid #C4B5FD', borderRadius: 10, padding: '10px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontSize: 20 }}>💎</span>
+                          <div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: '#6D28D9' }}>DEEP VALUE 確認済み</div>
+                            <div style={{ fontSize: 10, color: '#8B5CF6', marginTop: 1 }}>PBR {enrichRow.pbr.toFixed(2)} &lt; 1.0 ✓ かつ ROE {fundData.roe.toFixed(1)}% &gt; 10% ✓</div>
+                          </div>
+                        </div>
+                      )}
+                      {/* 3指標グリッド */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+                        {/* ROE */}
+                        <div style={{ background: fundData.roe >= 10 ? '#ECFDF5' : '#F8FAFC', borderRadius: 8, padding: '10px 10px' }}>
+                          <div style={{ fontSize: 9, color: '#94A3B8', marginBottom: 4, fontWeight: 600 }}>ROE</div>
+                          <div style={{ fontSize: 16, fontWeight: 700, color: fundData.roe != null ? (fundData.roe >= 10 ? '#15803D' : '#64748B') : '#CBD5E1' }}>
+                            {fundData.roe != null ? fundData.roe.toFixed(1) + '%' : '—'}
+                          </div>
+                          {fundData.roe != null && <div style={{ fontSize: 9, color: fundData.roe >= 10 ? '#15803D' : '#94A3B8', marginTop: 2 }}>{fundData.roe >= 10 ? '✓ 優秀' : fundData.roe >= 5 ? '普通' : '低い'}</div>}
+                        </div>
+                        {/* 自己資本比率 */}
+                        <div style={{ background: fundData.capitalRatio != null ? (fundData.capitalRatio >= 40 ? '#ECFDF5' : fundData.capitalRatio < 20 ? '#FEF2F2' : '#F8FAFC') : '#F8FAFC', borderRadius: 8, padding: '10px 10px' }}>
+                          <div style={{ fontSize: 9, color: '#94A3B8', marginBottom: 4, fontWeight: 600 }}>自己資本比率</div>
+                          <div style={{ fontSize: 16, fontWeight: 700, color: fundData.capitalRatio != null ? (fundData.capitalRatio >= 40 ? '#15803D' : fundData.capitalRatio < 20 ? '#DC2626' : '#64748B') : '#CBD5E1' }}>
+                            {fundData.capitalRatio != null ? fundData.capitalRatio + '%' : '—'}
+                          </div>
+                          {fundData.capitalRatio != null && <div style={{ fontSize: 9, fontWeight: 600, marginTop: 2, color: fundData.capitalRatio >= 40 ? '#15803D' : fundData.capitalRatio < 20 ? '#DC2626' : '#94A3B8' }}>
+                            {fundData.capitalRatio >= 40 ? '🔵 Safe' : fundData.capitalRatio < 20 ? '🔴 Risk' : '⚪ 普通'}
+                          </div>}
+                        </div>
+                        {/* 社長の関与度 */}
+                        <div style={{ background: fundData.insiderOwnership != null && fundData.insiderOwnership >= 30 ? '#FEF9C3' : '#F8FAFC', borderRadius: 8, padding: '10px 10px' }}>
+                          <div style={{ fontSize: 9, color: '#94A3B8', marginBottom: 4, fontWeight: 600 }}>社長の関与度</div>
+                          <div style={{ fontSize: 16, fontWeight: 700, color: fundData.insiderOwnership != null ? (fundData.insiderOwnership >= 30 ? '#92400E' : '#64748B') : '#CBD5E1' }}>
+                            {fundData.insiderOwnership != null ? fundData.insiderOwnership.toFixed(1) + '%' : '—'}
+                          </div>
+                          {fundData.insiderOwnership != null && <div style={{ fontSize: 9, fontWeight: 600, marginTop: 2, color: fundData.insiderOwnership >= 30 ? '#92400E' : '#94A3B8' }}>
+                            {fundData.insiderOwnership >= 30 ? '🏆 オーナー型' : fundData.insiderOwnership >= 10 ? '普通' : '低い'}
+                          </div>}
+                        </div>
+                      </div>
+                      {/* インサイダー30%以上の補足 */}
+                      {fundData.insiderOwnership != null && fundData.insiderOwnership >= 30 && (
+                        <div style={{ background: '#FEF9C3', border: '1px solid #FDE68A', borderRadius: 8, padding: '8px 12px', fontSize: 11, color: '#92400E', lineHeight: 1.6 }}>
+                          💡 <strong>オーナー経営</strong>: 役員・創業者が30%以上保有。株主と経営者の利益が一致しやすく、長期的なコミットメントの証です。スコア換算+15pt相当。
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               ) : null}
               <button onClick={() => setEnrichRow(null)}
@@ -627,7 +689,7 @@ export default function Page() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: NAVY, color: '#fff' }}>
-                {['', 'ティッカー', '価格 (USD)', 'JPY換算', '前日比', '52W高値比', '出来高比', '時価総額', 'P/E', 'シグナル'].map(h => (
+                {['', 'ティッカー', '価格 (USD)', 'JPY換算', '前日比', '52W高値比', '出来高比', '時価総額', 'P/E', 'PBR', 'シグナル'].map(h => (
                   <th key={h} style={{ padding: '10px 10px', textAlign: 'left', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
                 <th style={{ padding: '10px 10px', textAlign: 'left', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>
