@@ -9,6 +9,7 @@
  *   5. PSR                 0-10pt
  *   6. 出来高急増          0-8pt
  *   7. 前日モメンタム      0-4pt
+ *   8. 成長効率ボーナス    0-8pt  Rev≥30% かつ PSR<15（成長×割安）
  *
  * ポスト補正（加点後に適用）:
  *   A. ≤$2B 超小型マルチプライヤー × 1.2
@@ -83,6 +84,9 @@ export function calcScore(row) {
   else if (dc >= 5)  score += 3;
   else if (dc >= 3)  score += 2;
   else if (dc >= 1)  score += 1;
+
+  // 8. 成長効率ボーナス (0-8pt): Rev YoY ≥ 30% かつ PSR < 15 = 成長に対して割安
+  if ((rg || 0) >= 30 && psr != null && psr > 0 && psr < 15) score += 8;
 
   let result = Math.min(100, score);
 

@@ -273,3 +273,32 @@ describe('$20B超 → score ≤ 69 (B以下)', () => {
     expect(score).toBeGreaterThan(69);
   });
 });
+
+// ─── 成長効率ボーナス (Rev≥30% + PSR<15) ─────────────────────────────────────
+
+describe('成長効率ボーナス: Rev YoY ≥ 30% かつ PSR < 15 → +8pt', () => {
+  it('Rev 30% / PSR 10 → 30+7+8 = 45pt', () => {
+    // Rev 30% → 30pt, PSR 9.9 → 7pt, bonus → 8pt
+    expect(calcScore({ revenueGrowthYoy: 30, psr: 9.9 })).toBe(45);
+  });
+  it('Rev 30% / PSR 15 → ボーナス非適用（PSR < 15 が条件）', () => {
+    // Rev 30% → 30pt, PSR 15 → 4pt, bonus なし
+    expect(calcScore({ revenueGrowthYoy: 30, psr: 15 })).toBe(34);
+  });
+  it('Rev 29% / PSR 10 → ボーナス非適用（Rev < 30% が条件）', () => {
+    // Rev 29% → 15pt, PSR 9.9 → 7pt, bonus なし
+    expect(calcScore({ revenueGrowthYoy: 29, psr: 9.9 })).toBe(22);
+  });
+  it('Rev 50% / PSR 5 / $2B → ×1.2 適用 → ランク S', () => {
+    // 45+25+10+8 = 88 → ×1.2 = 100 → S
+    const score = calcScore({ revenueGrowthYoy: 50, marketCap: 2e9, psr: 4.9 });
+    expect(score).toBe(100);
+    expect(scoreRankLabel(score)).toBe('S');
+  });
+  it('Rev null → ボーナス非適用', () => {
+    expect(calcScore({ psr: 4.9 })).toBe(10); // PSR 10pt only, bonus needs Rev≥30%
+  });
+  it('PSR null → ボーナス非適用', () => {
+    expect(calcScore({ revenueGrowthYoy: 50 })).toBe(45); // Rev 45pt only
+  });
+});

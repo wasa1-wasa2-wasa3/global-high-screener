@@ -5,9 +5,12 @@ const UA        = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)';
 const BATCH     = 50;
 const CONCURRENT = 6;
 const THRESHOLD  = 0.95;
-const MIN_CAP    = 1_000_000_000;  // $1B  — 下限
-const MAX_CAP    = 20_000_000_000; // $20B — 上限（マルチバガー不適格ライン）
-const MIN_REV_YOY = 15;            // Rev YoY +15% 未満は除外
+const MIN_CAP          = 1_000_000_000;  // $1B  — 下限
+const MAX_CAP          = 20_000_000_000; // $20B — 上限（マルチバガー不適格ライン）
+const MIN_REV_YOY      = 15;   // Rev YoY +15% 未満は除外
+const MAX_PSR          = 25;   // PSR 25倍超 = 投機バブル、除外
+const MIN_VOL_AVG      = 200_000; // 日平均20万株未満 = 流動性不足、除外
+const MIN_GROSS_MARGIN = 40;   // グロス利益率40%未満 = 低品質ビジネス、除外
 
 // ─── Crumb ─────────────────────────────────────────────────────────────────
 
@@ -259,14 +262,16 @@ export async function POST() {
       );
     }
 
-    // フィルタ① (ハード): 52W高値圏 + $1B〜$20B の時価総額のみ通過
+    // フィルタ① (ハード): 52W高値圏 + 時価総額 + PSR + 流動性
     const candidates = rawQuotes
       .filter(q =>
         q.regularMarketPrice &&
         q.fiftyTwoWeekHigh &&
         (q.marketCap || 0) >= MIN_CAP &&
         (q.marketCap || 0) <= MAX_CAP &&
-        q.regularMarketPrice / q.fiftyTwoWeekHigh >= THRESHOLD
+        q.regularMarketPrice / q.fiftyTwoWeekHigh >= THRESHOLD &&
+        !(q.priceToSalesTrailing12Months > MAX_PSR) &&           // PSR 25倍超を除外
+        (q.averageDailyVolume10Day || q.averageDailyVolume3Month || 0) >= MIN_VOL_AVG // 流動性フィルタ
       )
       .map(q => mapQuote(q, tickerMap[q.symbol]))
       .filter(Boolean)
@@ -285,11 +290,11 @@ export async function POST() {
       return row;
     });
 
-    // フィルタ② (ハード): Rev YoY が判明している場合、+15% 未満を除外
+    // フィルタ② (ハード): Rev YoY < 15% 除外 + Gross Margin < 40% 除外
     const rows = enriched
       .filter(row =>
-        row.revenueGrowthYoy == null ||
-        row.revenueGrowthYoy >= MIN_REV_YOY
+        (row.revenueGrowthYoy == null || row.revenueGrowthYoy >= MIN_REV_YOY) &&
+        (row.grossMargin      == null || row.grossMargin      >= MIN_GROSS_MARGIN)
       )
       .sort((a, b) => b.score - a.score)
       .slice(0, 25);
