@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import AuthButton from '../components/AuthButton';
 import { getSignals } from '../lib/signals';
+import { calcScore } from '../lib/scoring';
 
 const NAVY  = '#0A1628';
 const NAVY2 = '#1E3A5F';
@@ -53,10 +54,13 @@ const RANK_DEFS = [
   { rank: 'D', range: '<50',    label: 'Ignore',       color: '#94A3B8', bg: '#F8FAFC', border: '#E2E8F0', bar: '#CBD5E1' },
 ];
 const SCORE_BREAKDOWN = [
-  { label: '52W高値近接',    max: 40, desc: '高値まで0% → +40pt' },
-  { label: '出来高急増',     max: 30, desc: '4x以上 → +30pt'    },
-  { label: '前日上昇モメンタム', max: 20, desc: '+7%以上 → +20pt'  },
-  { label: '時価総額信頼度', max: 10, desc: '$1T超 → +10pt'     },
+  { label: '売上成長率 YoY',   max: 45, desc: '+50%以上 → +45pt ★最優先' },
+  { label: '小型株プレミアム', max: 25, desc: '$2B以下 → +25pt'            },
+  { label: 'グロス利益率',     max: 15, desc: '70%以上 → +15pt'            },
+  { label: '52W高値近接',      max: 10, desc: '高値0% → +10pt'             },
+  { label: 'PSR',              max: 10, desc: '5倍未満 → +10pt'            },
+  { label: '出来高急増',       max:  8, desc: '4x以上 → +8pt'              },
+  { label: '前日モメンタム',   max:  4, desc: '+7%以上 → +4pt'             },
 ];
 function scoreRank(score) {
   return RANK_DEFS.find(r => {
@@ -198,12 +202,10 @@ function ScanRow({ row, rank, watchlist, onWatch, usdJpy, onEnrich }) {
         {row.volRatio ? row.volRatio.toFixed(1) + 'x' : '—'}
       </td>
       <td style={{ padding: '8px 10px', fontSize: 12, color: '#64748B' }}>{fmtMktCap(row.marketCap)}</td>
-      <td style={{ padding: '8px 10px', fontSize: 12, color: '#64748B' }}>{row.pe ? row.pe.toFixed(1) : '—'}</td>
-      <td style={{ padding: '8px 10px', fontSize: 12 }}>
-        {row.pbr != null
-          ? <span style={{ fontWeight: row.pbr < 1.0 ? 700 : 400, color: row.pbr < 1.0 ? '#7C3AED' : '#64748B' }}>{row.pbr.toFixed(2)}</span>
-          : <span style={{ color: '#CBD5E1' }}>—</span>}
+      <td style={{ padding: '8px 10px', fontSize: 12, fontWeight: row.psr != null && row.psr < 5 ? 700 : 400, color: row.psr != null && row.psr < 5 ? '#15803D' : '#64748B' }}>
+        {row.psr != null ? row.psr.toFixed(1) + 'x' : '—'}
       </td>
+      <td style={{ padding: '8px 10px', fontSize: 12, color: '#CBD5E1', fontStyle: 'italic' }} title="詳細ボタンで取得">—</td>
       <td style={{ padding: '8px 10px' }}>
         <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} />
       </td>
@@ -276,10 +278,11 @@ function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich }) {
             value={row.volRatio ? row.volRatio.toFixed(1) + 'x' : '—'}
             color={row.volRatio >= 2 ? '#DC2626' : '#374151'} />
           <MetricCell label="時価総額" value={fmtMktCap(row.marketCap)} />
-          <MetricCell label="P/E" value={row.pe ? row.pe.toFixed(1) : '—'} />
-          <MetricCell label="PBR" value={row.pbr != null ? row.pbr.toFixed(2) : '—'}
-            color={row.pbr > 0 && row.pbr < 1.0 ? '#7C3AED' : '#374151'}
-            bg={row.pbr > 0 && row.pbr < 1.0 ? '#F5F3FF' : '#F8FAFC'} />
+          <MetricCell label="PSR"
+            value={row.psr != null ? row.psr.toFixed(1) + 'x' : '—'}
+            color={row.psr != null && row.psr < 5 ? '#15803D' : '#374151'}
+            bg={row.psr != null && row.psr < 5 ? '#ECFDF5' : '#F8FAFC'} />
+          <MetricCell label="Rev YoY" value="—" color="#CBD5E1" />
         </div>
         <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} />
       </div>
@@ -522,20 +525,55 @@ export default function Page() {
                     </div>
                   </div>
                   {/* 経営実態 */}
-                  {fundData && (
+                  {fundData && (() => {
+                    const enhancedScore = calcScore({
+                      ...enrichRow,
+                      revenueGrowthYoy: fundData.revenueGrowthYoy,
+                      grossMargin: fundData.grossMargin,
+                    });
+                    const eRank = scoreRank(enhancedScore);
+                    return (
                     <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: 16 }}>
                       <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#7C3AED', marginBottom: 10 }}>FUNDAMENTALS — 経営実態</div>
-                      {/* DEEP VALUE 確認バッジ */}
-                      {enrichRow.pbr > 0 && enrichRow.pbr < 1.0 && fundData.roe != null && fundData.roe > 10.0 && (
-                        <div style={{ background: 'linear-gradient(135deg,#EDE9FE,#F5F3FF)', border: '1px solid #C4B5FD', borderRadius: 10, padding: '10px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <span style={{ fontSize: 20 }}>💎</span>
-                          <div>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: '#6D28D9' }}>DEEP VALUE 確認済み</div>
-                            <div style={{ fontSize: 10, color: '#8B5CF6', marginTop: 1 }}>PBR {enrichRow.pbr.toFixed(2)} &lt; 1.0 ✓ かつ ROE {fundData.roe.toFixed(1)}% &gt; 10% ✓</div>
+                      {/* 詳細スコアバッジ */}
+                      <div style={{ background: '#F8FAFC', borderRadius: 10, padding: '10px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div>
+                          <div style={{ fontSize: 9, color: '#94A3B8', marginBottom: 2 }}>スキャン時スコア</div>
+                          <div style={{ fontSize: 16, fontWeight: 700, color: '#64748B' }}>{enrichRow.score}pt</div>
+                        </div>
+                        <div style={{ fontSize: 20, color: '#CBD5E1' }}>→</div>
+                        <div>
+                          <div style={{ fontSize: 9, color: '#7C3AED', fontWeight: 700, marginBottom: 2 }}>ファンダ込みスコア</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 20, fontWeight: 800, color: eRank.color }}>{enhancedScore}pt</span>
+                            <span style={{ fontSize: 13, fontWeight: 800, background: eRank.bg, color: eRank.color, border: `1px solid ${eRank.border}`, padding: '2px 7px', borderRadius: 5 }}>{eRank.rank}</span>
                           </div>
                         </div>
-                      )}
-                      {/* 3指標グリッド */}
+                      </div>
+                      {/* 成長指標グリッド */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                        {/* Revenue Growth YoY */}
+                        <div style={{ background: fundData.revenueGrowthYoy != null ? (fundData.revenueGrowthYoy >= 50 ? '#ECFDF5' : fundData.revenueGrowthYoy >= 20 ? '#FFFBEB' : '#F8FAFC') : '#F8FAFC', borderRadius: 8, padding: '10px 10px', border: fundData.revenueGrowthYoy >= 50 ? '1px solid #86EFAC' : '1px solid transparent' }}>
+                          <div style={{ fontSize: 9, color: '#94A3B8', marginBottom: 4, fontWeight: 600 }}>売上成長率 YoY ★</div>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: fundData.revenueGrowthYoy != null ? (fundData.revenueGrowthYoy >= 30 ? '#15803D' : fundData.revenueGrowthYoy >= 10 ? '#D97706' : '#64748B') : '#CBD5E1' }}>
+                            {fundData.revenueGrowthYoy != null ? (fundData.revenueGrowthYoy >= 0 ? '+' : '') + fundData.revenueGrowthYoy.toFixed(1) + '%' : '—'}
+                          </div>
+                          {fundData.revenueGrowthYoy != null && <div style={{ fontSize: 9, fontWeight: 600, marginTop: 2, color: fundData.revenueGrowthYoy >= 50 ? '#15803D' : fundData.revenueGrowthYoy >= 30 ? '#D97706' : '#94A3B8' }}>
+                            {fundData.revenueGrowthYoy >= 50 ? '+45pt ★最優先' : fundData.revenueGrowthYoy >= 30 ? '+30pt' : fundData.revenueGrowthYoy >= 20 ? '+15pt' : fundData.revenueGrowthYoy >= 10 ? '+6pt' : '+0pt'}
+                          </div>}
+                        </div>
+                        {/* Gross Margin */}
+                        <div style={{ background: fundData.grossMargin != null ? (fundData.grossMargin >= 70 ? '#ECFDF5' : fundData.grossMargin >= 50 ? '#FFFBEB' : '#F8FAFC') : '#F8FAFC', borderRadius: 8, padding: '10px 10px' }}>
+                          <div style={{ fontSize: 9, color: '#94A3B8', marginBottom: 4, fontWeight: 600 }}>グロス利益率</div>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: fundData.grossMargin != null ? (fundData.grossMargin >= 70 ? '#15803D' : fundData.grossMargin >= 50 ? '#D97706' : '#64748B') : '#CBD5E1' }}>
+                            {fundData.grossMargin != null ? fundData.grossMargin.toFixed(1) + '%' : '—'}
+                          </div>
+                          {fundData.grossMargin != null && <div style={{ fontSize: 9, fontWeight: 600, marginTop: 2, color: fundData.grossMargin >= 70 ? '#15803D' : fundData.grossMargin >= 50 ? '#D97706' : '#94A3B8' }}>
+                            {fundData.grossMargin >= 70 ? '+15pt SaaS級' : fundData.grossMargin >= 50 ? '+8pt' : fundData.grossMargin >= 30 ? '+3pt' : '+0pt'}
+                          </div>}
+                        </div>
+                      </div>
+                      {/* 財務健全性グリッド */}
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
                         {/* ROE */}
                         <div style={{ background: fundData.roe >= 10 ? '#ECFDF5' : '#F8FAFC', borderRadius: 8, padding: '10px 10px' }}>
@@ -555,9 +593,9 @@ export default function Page() {
                             {fundData.capitalRatio >= 40 ? '🔵 Safe' : fundData.capitalRatio < 20 ? '🔴 Risk' : '⚪ 普通'}
                           </div>}
                         </div>
-                        {/* 社長の関与度 */}
+                        {/* インサイダー保有 */}
                         <div style={{ background: fundData.insiderOwnership != null && fundData.insiderOwnership >= 30 ? '#FEF9C3' : '#F8FAFC', borderRadius: 8, padding: '10px 10px' }}>
-                          <div style={{ fontSize: 9, color: '#94A3B8', marginBottom: 4, fontWeight: 600 }}>社長の関与度</div>
+                          <div style={{ fontSize: 9, color: '#94A3B8', marginBottom: 4, fontWeight: 600 }}>インサイダー</div>
                           <div style={{ fontSize: 16, fontWeight: 700, color: fundData.insiderOwnership != null ? (fundData.insiderOwnership >= 30 ? '#92400E' : '#64748B') : '#CBD5E1' }}>
                             {fundData.insiderOwnership != null ? fundData.insiderOwnership.toFixed(1) + '%' : '—'}
                           </div>
@@ -566,14 +604,9 @@ export default function Page() {
                           </div>}
                         </div>
                       </div>
-                      {/* インサイダー30%以上の補足 */}
-                      {fundData.insiderOwnership != null && fundData.insiderOwnership >= 30 && (
-                        <div style={{ background: '#FEF9C3', border: '1px solid #FDE68A', borderRadius: 8, padding: '8px 12px', fontSize: 11, color: '#92400E', lineHeight: 1.6 }}>
-                          💡 <strong>オーナー経営</strong>: 役員・創業者が30%以上保有。株主と経営者の利益が一致しやすく、長期的なコミットメントの証です。スコア換算+15pt相当。
-                        </div>
-                      )}
                     </div>
-                  )}
+                    );
+                  })()}
                 </>
               ) : null}
               <button onClick={() => setEnrichRow(null)}
@@ -689,7 +722,7 @@ export default function Page() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: NAVY, color: '#fff' }}>
-                {['', 'ティッカー', '価格 (USD)', 'JPY換算', '前日比', '52W高値比', '出来高比', '時価総額', 'P/E', 'PBR', 'シグナル'].map(h => (
+                {['', 'ティッカー', '価格 (USD)', 'JPY換算', '前日比', '52W高値比', '出来高比', '時価総額', 'PSR', 'Rev YoY', 'シグナル'].map(h => (
                   <th key={h} style={{ padding: '10px 10px', textAlign: 'left', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
                 <th style={{ padding: '10px 10px', textAlign: 'left', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>

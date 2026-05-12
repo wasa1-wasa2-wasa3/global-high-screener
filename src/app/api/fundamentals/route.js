@@ -56,7 +56,17 @@ export async function POST(request) {
 
     const currentRatio = fd?.currentRatio?.raw ?? null;
 
-    return Response.json({ roe, debtToEquity, capitalRatio, insiderOwnership, currentRatio });
+    // revenueGrowth.raw は小数 (0.30 = 30%) → % 単位に変換
+    const revenueGrowthYoy = fd?.revenueGrowth?.raw != null
+      ? Math.round(fd.revenueGrowth.raw * 1000) / 10
+      : null;
+
+    // grossMargins.raw は小数 (0.70 = 70%)
+    const grossMargin = fd?.grossMargins?.raw != null
+      ? Math.round(fd.grossMargins.raw * 1000) / 10
+      : null;
+
+    return Response.json({ roe, debtToEquity, capitalRatio, insiderOwnership, currentRatio, revenueGrowthYoy, grossMargin });
   } catch (e) {
     return Response.json({ error: e.message }, { status: 500 });
   }

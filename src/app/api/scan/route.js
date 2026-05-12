@@ -173,6 +173,9 @@ function mapQuote(q, meta) {
     specialDividend: (q.trailingAnnualDividendYield || 0) > 0.25,
     ma50:    q.fiftyDayAverage || null,
     ma50Dev,
+    psr:     q.priceToSalesTrailing12Months > 0
+      ? Math.round(q.priceToSalesTrailing12Months * 10) / 10
+      : null,
     earningsDate: q.earningsTimestamp
       ? new Date(q.earningsTimestamp * 1000).toISOString().slice(0, 10)
       : null,
