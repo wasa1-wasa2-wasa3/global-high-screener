@@ -202,10 +202,15 @@ function ScanRow({ row, rank, watchlist, onWatch, usdJpy, onEnrich }) {
         {row.volRatio ? row.volRatio.toFixed(1) + 'x' : '—'}
       </td>
       <td style={{ padding: '8px 10px', fontSize: 12, color: '#64748B' }}>{fmtMktCap(row.marketCap)}</td>
-      <td style={{ padding: '8px 10px', fontSize: 12, fontWeight: row.psr != null && row.psr < 5 ? 700 : 400, color: row.psr != null && row.psr < 5 ? '#15803D' : '#64748B' }}>
-        {row.psr != null ? row.psr.toFixed(1) + 'x' : '—'}
+      <td style={{ padding: '8px 10px', fontSize: 12,
+        fontWeight: row.revenueGrowthYoy != null && row.revenueGrowthYoy >= 30 ? 700 : 400,
+        color: row.revenueGrowthYoy != null ? (row.revenueGrowthYoy >= 50 ? '#15803D' : row.revenueGrowthYoy >= 20 ? '#D97706' : '#64748B') : '#CBD5E1' }}>
+        {row.revenueGrowthYoy != null ? (row.revenueGrowthYoy >= 0 ? '+' : '') + row.revenueGrowthYoy.toFixed(1) + '%' : '—'}
       </td>
-      <td style={{ padding: '8px 10px', fontSize: 12, color: '#CBD5E1', fontStyle: 'italic' }} title="詳細ボタンで取得">—</td>
+      <td style={{ padding: '8px 10px', fontSize: 12,
+        color: row.grossMargin != null ? (row.grossMargin >= 70 ? '#15803D' : row.grossMargin >= 50 ? '#D97706' : '#64748B') : '#CBD5E1' }}>
+        {row.grossMargin != null ? row.grossMargin.toFixed(1) + '%' : '—'}
+      </td>
       <td style={{ padding: '8px 10px' }}>
         <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} />
       </td>
@@ -278,11 +283,14 @@ function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich }) {
             value={row.volRatio ? row.volRatio.toFixed(1) + 'x' : '—'}
             color={row.volRatio >= 2 ? '#DC2626' : '#374151'} />
           <MetricCell label="時価総額" value={fmtMktCap(row.marketCap)} />
-          <MetricCell label="PSR"
-            value={row.psr != null ? row.psr.toFixed(1) + 'x' : '—'}
-            color={row.psr != null && row.psr < 5 ? '#15803D' : '#374151'}
-            bg={row.psr != null && row.psr < 5 ? '#ECFDF5' : '#F8FAFC'} />
-          <MetricCell label="Rev YoY" value="—" color="#CBD5E1" />
+          <MetricCell label="Rev YoY"
+            value={row.revenueGrowthYoy != null ? (row.revenueGrowthYoy >= 0 ? '+' : '') + row.revenueGrowthYoy.toFixed(1) + '%' : '—'}
+            color={row.revenueGrowthYoy != null ? (row.revenueGrowthYoy >= 50 ? '#15803D' : row.revenueGrowthYoy >= 20 ? '#D97706' : '#64748B') : '#CBD5E1'}
+            bg={row.revenueGrowthYoy != null && row.revenueGrowthYoy >= 30 ? '#ECFDF5' : '#F8FAFC'} />
+          <MetricCell label="Gross Mg"
+            value={row.grossMargin != null ? row.grossMargin.toFixed(1) + '%' : '—'}
+            color={row.grossMargin != null ? (row.grossMargin >= 70 ? '#15803D' : row.grossMargin >= 50 ? '#D97706' : '#64748B') : '#CBD5E1'}
+            bg={row.grossMargin != null && row.grossMargin >= 70 ? '#ECFDF5' : '#F8FAFC'} />
         </div>
         <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} />
       </div>
@@ -722,7 +730,7 @@ export default function Page() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: NAVY, color: '#fff' }}>
-                {['', 'ティッカー', '価格 (USD)', 'JPY換算', '前日比', '52W高値比', '出来高比', '時価総額', 'PSR', 'Rev YoY', 'シグナル'].map(h => (
+                {['', 'ティッカー', '価格 (USD)', 'JPY換算', '前日比', '52W高値比', '出来高比', '時価総額', 'Rev YoY', 'Gross Mg', 'シグナル'].map(h => (
                   <th key={h} style={{ padding: '10px 10px', textAlign: 'left', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
                 <th style={{ padding: '10px 10px', textAlign: 'left', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>

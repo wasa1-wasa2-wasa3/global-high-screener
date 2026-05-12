@@ -176,3 +176,31 @@ describe('スコア上限', () => {
     expect(calcScore({})).toBe(0);
   });
 });
+
+// ─── $50B+ 大型株キャップ ─────────────────────────────────────────────────────
+
+describe('$50B+ 大型株 → スコア強制上限 10 (D)', () => {
+  it('$50.1B / Rev+50% / GrossMargin 90% → 最大 10pt', () => {
+    const score = calcScore({
+      marketCap: 5.01e10,
+      revenueGrowthYoy: 50,
+      grossMargin: 90,
+      price: 100, week52High: 100,
+      volume: 5000000, volAvg: 1000000,
+    });
+    expect(score).toBeLessThanOrEqual(10);
+    expect(scoreRankLabel(score)).toBe('D');
+  });
+  it('$100B (メガキャップ) → 10pt 以下', () => {
+    expect(calcScore({ marketCap: 1e11, revenueGrowthYoy: 50 })).toBeLessThanOrEqual(10);
+  });
+  it('$50B ちょうど → キャップ対象外（$50B以下）', () => {
+    const score = calcScore({ marketCap: 5e10, revenueGrowthYoy: 50 });
+    expect(score).toBeGreaterThan(10);
+  });
+  it('SKM相当 $15B / Rev低成長 → D（キャップなし、自然にD）', () => {
+    const score = calcScore({ marketCap: 1.52e10, revenueGrowthYoy: 3, price: 100, week52High: 102 });
+    expect(score).toBeLessThan(50);
+    expect(scoreRankLabel(score)).toBe('D');
+  });
+});

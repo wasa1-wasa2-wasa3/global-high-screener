@@ -184,6 +184,42 @@ function mapQuote(q, meta) {
   return row;
 }
 
+// ─── Phase 3: 上位25件の fundamentals を並列取得 ──────────────────────────
+
+async function fetchOneFundamentals(ticker, crumb, cookie) {
+  const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}`
+    + `?modules=financialData&crumb=${encodeURIComponent(crumb)}`;
+  const ctrl  = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 5000);
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': UA, 'Cookie': cookie }, signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!res.ok) return { ticker };
+    const data = await res.json();
+    const fd = data.quoteSummary?.result?.[0]?.financialData;
+    if (!fd) return { ticker };
+    return {
+      ticker,
+      revenueGrowthYoy: fd.revenueGrowth?.raw != null
+        ? Math.round(fd.revenueGrowth.raw * 1000) / 10 : null,
+      grossMargin: fd.grossMargins?.raw != null
+        ? Math.round(fd.grossMargins.raw * 1000) / 10 : null,
+    };
+  } catch {
+    clearTimeout(timer);
+    return { ticker };
+  }
+}
+
+async function enrichCandidates(candidates, crumb, cookie) {
+  const results = await Promise.allSettled(
+    candidates.map(row => fetchOneFundamentals(row.ticker, crumb, cookie))
+  );
+  const map = {};
+  results.forEach(r => { if (r.status === 'fulfilled') map[r.value.ticker] = r.value; });
+  return map;
+}
+
 // ─── Main handler ─────────────────────────────────────────────────────────
 
 export const maxDuration = 60;
@@ -234,8 +270,22 @@ export async function POST() {
       .sort((a, b) => b.score - a.score)
       .slice(0, 25);
 
+    // Phase 3: 上位25件の fundamentals (revenueGrowthYoy / grossMargin) を並列取得
+    const fundMap = await enrichCandidates(candidates, crumb, cookie);
+    const rows = candidates
+      .map(row => {
+        const f = fundMap[row.ticker];
+        if (f?.revenueGrowthYoy != null || f?.grossMargin != null) {
+          row.revenueGrowthYoy = f.revenueGrowthYoy ?? null;
+          row.grossMargin      = f.grossMargin      ?? null;
+          row.score = calcScore(row);
+        }
+        return row;
+      })
+      .sort((a, b) => b.score - a.score);
+
     return Response.json({
-      rows: candidates,
+      rows,
       scannedCount,
       scannedAt: new Date().toISOString(),
       source: screenerHasFull ? 'screener' : screenerOk ? 'screener+v7' : 'static',

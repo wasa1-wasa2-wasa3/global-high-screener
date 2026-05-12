@@ -84,7 +84,12 @@ export function calcScore(row) {
   else if (dc >= 3)  score += 2;
   else if (dc >= 1)  score += 1;
 
-  return Math.min(100, score);
+  const result = Math.min(100, score);
+
+  // $50B+ (大型・メガキャップ) = マルチバガー不適格 → スコア上限 10 (強制 D)
+  if ((row.marketCap || 0) > 5e10) return Math.min(10, result);
+
+  return result;
 }
 
 /**
