@@ -74,8 +74,8 @@ describe('revenueGrowthYoy ブラケット', () => {
 // ─── 小型株プレミアム ─────────────────────────────────────────────────────────
 
 describe('marketCap 小型株プレミアム', () => {
-  it('$2B → 25pt（超小型）', () => {
-    expect(calcScore({ marketCap: 2e9 })).toBe(25);
+  it('$2B → 30pt（超小型 × 1.2マルチプライヤー適用: 25×1.2=30）', () => {
+    expect(calcScore({ marketCap: 2e9 })).toBe(30);
   });
   it('$2.1B → 20pt（$2-5B 小型）', () => {
     expect(calcScore({ marketCap: 2.1e9 })).toBe(20);
@@ -202,5 +202,74 @@ describe('$50B+ 大型株 → スコア強制上限 10 (D)', () => {
     const score = calcScore({ marketCap: 1.52e10, revenueGrowthYoy: 3, price: 100, week52High: 102 });
     expect(score).toBeLessThan(50);
     expect(scoreRankLabel(score)).toBe('D');
+  });
+});
+
+// ─── ×1.2 超小型マルチプライヤー ─────────────────────────────────────────────
+
+describe('≤$2B 超小型マルチプライヤー × 1.2', () => {
+  it('Rev +50% / $1B → ×1.2 適用でランクS', () => {
+    // 45 (rev) + 25 (cap) = 70 → ×1.2 = 84 → S
+    const score = calcScore({ revenueGrowthYoy: 50, marketCap: 1e9 });
+    expect(score).toBe(84);
+    expect(scoreRankLabel(score)).toBe('S');
+  });
+  it('Rev +80% / $1B → ランク S（ユーザー指定テスト）', () => {
+    // 45 + 25 = 70 → ×1.2 = 84 → S
+    const score = calcScore({ revenueGrowthYoy: 80, marketCap: 1e9 });
+    expect(score).toBeGreaterThanOrEqual(80);
+    expect(scoreRankLabel(score)).toBe('S');
+  });
+  it('$2.1B → マルチプライヤー非適用（そのまま）', () => {
+    // 25B超のブラケット境界: $2.1B → 20pt, no ×1.2
+    expect(calcScore({ marketCap: 2.1e9 })).toBe(20);
+  });
+});
+
+// ─── Rev YoY > 50% → 最低 B 保証 ─────────────────────────────────────────────
+
+describe('Rev YoY > 50% → 最低ランク B (score ≥ 60)', () => {
+  it('Rev 51% / marketCap なし → floor 発動 → 60pt', () => {
+    // 45pt のみ → floor → 60
+    const score = calcScore({ revenueGrowthYoy: 51 });
+    expect(score).toBe(60);
+    expect(scoreRankLabel(score)).toBe('B');
+  });
+  it('Rev 50% ちょうど → floor 対象外（>50% が条件）', () => {
+    // 45pt → floor なし → 45
+    expect(calcScore({ revenueGrowthYoy: 50 })).toBe(45);
+  });
+  it('Rev 70% / $15B → floor + $20B以下のため B を超えられる', () => {
+    // 45+6 = 51 → floor → 60 → no $20B cap ($15B < $20B) → 60 → B
+    const score = calcScore({ marketCap: 1.5e10, revenueGrowthYoy: 70 });
+    expect(score).toBeGreaterThanOrEqual(60);
+  });
+});
+
+// ─── $20B超 → B以下に制限 ────────────────────────────────────────────────────
+
+describe('$20B超 → score ≤ 69 (B以下)', () => {
+  it('$20.1B / 全指標最大 → Bキャップ (score = 69)', () => {
+    // raw: 45+6+15+10+10+8+4 = 98 → cap → 69
+    const score = calcScore({
+      marketCap: 2.01e10,
+      revenueGrowthYoy: 100, grossMargin: 90,
+      price: 100, week52High: 100,
+      volume: 5000000, volAvg: 1000000,
+      dayChangePct: 10, psr: 1,
+    });
+    expect(score).toBe(69);
+    expect(scoreRankLabel(score)).toBe('B');
+  });
+  it('$20B ちょうど → Bキャップ対象外（> 20B が条件）', () => {
+    const score = calcScore({
+      marketCap: 2e10,
+      revenueGrowthYoy: 100, grossMargin: 90,
+      price: 100, week52High: 100,
+      volume: 5000000, volAvg: 1000000,
+      dayChangePct: 10, psr: 1,
+    });
+    // raw = 98 → no cap → S
+    expect(score).toBeGreaterThan(69);
   });
 });

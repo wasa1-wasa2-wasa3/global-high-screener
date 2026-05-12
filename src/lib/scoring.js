@@ -1,20 +1,20 @@
 /**
  * calcScore: US株マルチバガー探索スコア (0-100)
  *
- * 優先順位:
- *   1. 売上成長率 (revenueGrowthYoy)  0-45pt — 最優先。fundamentals popup で取得
- *   2. 小型株プレミアム (marketCap)    0-25pt — $10B以下に傾斜
- *   3. グロス利益率 (grossMargin)      0-15pt — fundamentals popup で取得
- *   4. 52週高値近接                    0-10pt — ブレイクアウトタイミング確認
- *   5. PSR                             0-10pt — 成長株向けバリュエーション
- *   6. 出来高急増                       0-8pt — 機関参戦シグナル
- *   7. 前日上昇モメンタム               0-4pt — 短期モメンタム確認
+ * 加点ブラケット（Phase 3 でスキャン時に全データ取得済み）:
+ *   1. 売上成長率 YoY      0-45pt  最優先
+ *   2. 小型株プレミアム    0-25pt  $10B以下に傾斜
+ *   3. グロス利益率        0-15pt
+ *   4. 52週高値近接        0-10pt
+ *   5. PSR                 0-10pt
+ *   6. 出来高急増          0-8pt
+ *   7. 前日モメンタム      0-4pt
  *
- * スキャン時点では revenueGrowthYoy / grossMargin は null のため最大 57pt。
- * fundamentals popup から取得後に再計算すると最大 100pt。
- *
- * 廃止: PBR / PER 重み（成長株は割高が当然のため除外）
- * 廃止: 大型株ボーナス（小型株プレミアムに逆転）
+ * ポスト補正（加点後に適用）:
+ *   A. ≤$2B 超小型マルチプライヤー × 1.2
+ *   B. Rev YoY > 50% → 最低ランク B 保証（score ≥ 60）
+ *   C. $20B超 → B以下に制限（score ≤ 69）
+ *   D. $50B超 → 強制 D（score ≤ 10）
  */
 export function calcScore(row) {
   let score = 0;
@@ -84,10 +84,19 @@ export function calcScore(row) {
   else if (dc >= 3)  score += 2;
   else if (dc >= 1)  score += 1;
 
-  const result = Math.min(100, score);
+  let result = Math.min(100, score);
 
-  // $50B+ (大型・メガキャップ) = マルチバガー不適格 → スコア上限 10 (強制 D)
-  if ((row.marketCap || 0) > 5e10) return Math.min(10, result);
+  // A. ≤$2B 超小型マルチプライヤー × 1.2（10倍成長の余地が最も大きいため）
+  if (mc > 0 && mc <= 2e9) result = Math.min(100, Math.round(result * 1.2));
+
+  // B. Rev YoY > 50% = 成長最優先 → 最低 B ランク保証（score ≥ 60）
+  if ((rg || 0) > 50 && result < 60) result = 60;
+
+  // C. $20B超 = 10倍成長の余地なし → B以下に制限（score ≤ 69）
+  if (mc > 2e10 && mc <= 5e10) result = Math.min(69, result);
+
+  // D. $50B超 = マルチバガー不適格 → 強制 D（score ≤ 10）
+  if (mc > 5e10) return Math.min(10, result);
 
   return result;
 }
