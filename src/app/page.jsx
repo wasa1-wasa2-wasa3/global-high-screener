@@ -712,12 +712,25 @@ export default function Page() {
       {/* Results */}
       {displayRows.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94A3B8' }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>{tab === 'scan' ? '🔍' : '⭐'}</div>
-          <p style={{ fontSize: 14 }}>
-            {tab === 'scan'
-              ? '「52週高値スキャン実行」ボタンを押すと、52週高値圏の銘柄が表示されます'
-              : '★ボタンで銘柄をウォッチリストに追加してください'}
-          </p>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>
+            {tab === 'watchlist' ? '⭐' : scannedAt ? '🔎' : '🔍'}
+          </div>
+          {tab === 'watchlist' ? (
+            <p style={{ fontSize: 14 }}>★ボタンで銘柄をウォッチリストに追加してください</p>
+          ) : scannedAt ? (
+            <div>
+              <p style={{ fontSize: 15, fontWeight: 700, color: '#374151', marginBottom: 6 }}>
+                マルチバガー候補が見つかりませんでした
+              </p>
+              <p style={{ fontSize: 13, lineHeight: 1.7, maxWidth: 360, margin: '0 auto', color: '#94A3B8' }}>
+                時価総額 $1B〜$20B かつ 売上成長率 +15% 以上の条件を<br />
+                満たす52週高値圏の銘柄が現在存在しません。<br />
+                時間をおいて再スキャンしてください。
+              </p>
+            </div>
+          ) : (
+            <p style={{ fontSize: 14 }}>「52週高値スキャン実行」ボタンを押すと、52週高値圏の銘柄が表示されます</p>
+          )}
         </div>
       ) : isMobile ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

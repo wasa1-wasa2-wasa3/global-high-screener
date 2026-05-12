@@ -5,7 +5,9 @@ const UA        = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)';
 const BATCH     = 50;
 const CONCURRENT = 6;
 const THRESHOLD  = 0.95;
-const MIN_CAP    = 1_000_000_000; // $1B
+const MIN_CAP    = 1_000_000_000;  // $1B  — 下限
+const MAX_CAP    = 20_000_000_000; // $20B — 上限（マルチバガー不適格ライン）
+const MIN_REV_YOY = 15;            // Rev YoY +15% 未満は除外
 
 // ─── Crumb ─────────────────────────────────────────────────────────────────
 
@@ -257,32 +259,40 @@ export async function POST() {
       );
     }
 
-    // フィルタ → スコア → 上位25件
+    // フィルタ① (ハード): 52W高値圏 + $1B〜$20B の時価総額のみ通過
     const candidates = rawQuotes
       .filter(q =>
         q.regularMarketPrice &&
         q.fiftyTwoWeekHigh &&
         (q.marketCap || 0) >= MIN_CAP &&
+        (q.marketCap || 0) <= MAX_CAP &&
         q.regularMarketPrice / q.fiftyTwoWeekHigh >= THRESHOLD
       )
       .map(q => mapQuote(q, tickerMap[q.symbol]))
       .filter(Boolean)
       .sort((a, b) => b.score - a.score)
-      .slice(0, 25);
+      .slice(0, 50); // Rev YoY フィルタ後も25件残るよう多めに取得
 
-    // Phase 3: 上位25件の fundamentals (revenueGrowthYoy / grossMargin) を並列取得
+    // Phase 3: 上位50件の fundamentals (revenueGrowthYoy / grossMargin) を並列取得
     const fundMap = await enrichCandidates(candidates, crumb, cookie);
-    const rows = candidates
-      .map(row => {
-        const f = fundMap[row.ticker];
-        if (f?.revenueGrowthYoy != null || f?.grossMargin != null) {
-          row.revenueGrowthYoy = f.revenueGrowthYoy ?? null;
-          row.grossMargin      = f.grossMargin      ?? null;
-          row.score = calcScore(row);
-        }
-        return row;
-      })
-      .sort((a, b) => b.score - a.score);
+    const enriched = candidates.map(row => {
+      const f = fundMap[row.ticker];
+      if (f?.revenueGrowthYoy != null || f?.grossMargin != null) {
+        row.revenueGrowthYoy = f.revenueGrowthYoy ?? null;
+        row.grossMargin      = f.grossMargin      ?? null;
+        row.score = calcScore(row);
+      }
+      return row;
+    });
+
+    // フィルタ② (ハード): Rev YoY が判明している場合、+15% 未満を除外
+    const rows = enriched
+      .filter(row =>
+        row.revenueGrowthYoy == null ||
+        row.revenueGrowthYoy >= MIN_REV_YOY
+      )
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 25);
 
     return Response.json({
       rows,
