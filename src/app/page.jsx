@@ -13,7 +13,7 @@ const GOLD2 = '#F0C040';
 const WATCH_KEY     = 'us_watchlist_v1';
 const LAST_SCAN_KEY = 'us_scan_last_v1';
 const GUIDE_KEY     = 'guide_seen_us_v1';
-const FILTER_KEY    = 'us_filter_v1';
+const FILTER_KEY    = 'us_filter_v2'; // v2: default 'all'、旧 'small' キャッシュをリセット
 const LIST_TYPE     = 'us_scan';
 
 function fmtPrice(v) {
@@ -308,7 +308,7 @@ export default function Page() {
   const [isMobile, setIsMobile]       = useState(false);
   const [scannedAt, setScannedAt]     = useState(null);
   const [scannedCount, setScannedCount] = useState(null);
-  const [capFilter, setCapFilter]     = useState(() => { try { return JSON.parse(localStorage.getItem(FILTER_KEY))?.cap || 'small'; } catch { return 'small'; } });
+  const [capFilter, setCapFilter]     = useState(() => { try { return JSON.parse(localStorage.getItem(FILTER_KEY))?.cap || 'all'; } catch { return 'all'; } });
   const [sectorFilter, setSectorFilter] = useState(() => { try { return JSON.parse(localStorage.getItem(FILTER_KEY))?.sector || 'all'; } catch { return 'all'; } });
   const [errorMsg, setErrorMsg]       = useState(null);
   const [enrichRow, setEnrichRow]     = useState(null);
@@ -417,11 +417,12 @@ export default function Page() {
     setWatchRefreshing(false);
   }
 
+  // API は $1B–$20B のみ返す。クライアント側フィルタもそれに合わせて再定義
   const capRanges = {
     all:   { min: 0,    max: Infinity },
-    small: { min: 1e9,  max: 1e10 },
-    mid:   { min: 1e10, max: 1e11 },
-    large: { min: 1e11, max: Infinity },
+    micro: { min: 1e9,  max: 2e9  },  // $1B–$2B 超小型（×1.2 マルチプライヤー対象）
+    small: { min: 2e9,  max: 1e10 },  // $2B–$10B 小型
+    mid:   { min: 1e10, max: 2e10 },  // $10B–$20B 中小型（API 上限）
   };
   const { min: capMin, max: capMax } = capRanges[capFilter] || capRanges.all;
 
@@ -656,10 +657,10 @@ export default function Page() {
         {scannedAt && <span style={{ fontSize: 12, color: '#888' }}>最終: {new Date(scannedAt).toLocaleString('ja-JP')}</span>}
         <select value={capFilter} onChange={e => setCapFilter(e.target.value)}
           style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 13, cursor: 'pointer', minHeight: 44 }}>
-          <option value="all">規模: すべて</option>
-          <option value="small">Small ($1B–$10B) 原石</option>
-          <option value="mid">Mid ($10B–$100B) 本命</option>
-          <option value="large">Large ($100B+) 主力株</option>
+          <option value="all">規模: すべて ($1B–$20B)</option>
+          <option value="micro">超小型 ($1B–$2B) ×1.2 ボーナス</option>
+          <option value="small">小型 ($2B–$10B)</option>
+          <option value="mid">中小型 ($10B–$20B)</option>
         </select>
         {sectors.length > 2 && (
           <select value={sectorFilter} onChange={e => setSectorFilter(e.target.value)}
