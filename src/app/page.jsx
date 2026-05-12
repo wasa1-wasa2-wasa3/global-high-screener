@@ -179,8 +179,10 @@ function ScanRow({ row, rank, watchlist, onWatch, usdJpy, onEnrich }) {
             style={{ color: NAVY, fontWeight: 700, fontSize: 14, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', textDecorationStyle: 'dotted' }}>
             {row.ticker}
           </button>
-          <a href={`https://finance.yahoo.com/quote/${row.ticker}`} target="_blank" rel="noopener noreferrer"
-            style={{ fontSize: 10, color: '#94A3B8', textDecoration: 'none' }}>↗</a>
+          <a href={`https://finance.yahoo.com/quote/${row.ticker}/chart`} target="_blank" rel="noopener noreferrer"
+            className="yf-chart-link"
+            title={`${row.ticker} チャートを開く`}
+            style={{ fontSize: 11, color: '#94A3B8', textDecoration: 'none', opacity: 0.7 }}>📈</a>
         </div>
         <div style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>{row.name?.slice(0, 22)}</div>
         <div style={{ fontSize: 10, color: '#94A3B8' }}>{row.sector}</div>
@@ -246,8 +248,10 @@ function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich }) {
               style={{ color: GOLD, fontWeight: 700, fontSize: 19, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', textDecorationStyle: 'dotted', textDecorationColor: GOLD }}>
               {row.ticker}
             </button>
-            <a href={`https://finance.yahoo.com/quote/${row.ticker}`} target="_blank" rel="noopener noreferrer"
-              style={{ fontSize: 11, color: '#64748B', textDecoration: 'none' }}>↗YF</a>
+            <a href={`https://finance.yahoo.com/quote/${row.ticker}/chart`} target="_blank" rel="noopener noreferrer"
+              className="yf-chart-link"
+              title={`${row.ticker} チャートを開く`}
+              style={{ fontSize: 12, color: '#94A3B8', textDecoration: 'none', opacity: 0.8 }}>📈Chart</a>
             <span style={{ background: scoreRank(row.score).bg, color: scoreRank(row.score).color, padding: '2px 8px', borderRadius: 10, fontWeight: 700, fontSize: 12, border: `1px solid ${scoreRank(row.score).border}` }}>
               {scoreRank(row.score).rank} {row.score}
             </span>
@@ -451,6 +455,8 @@ export default function Page() {
           50%       { box-shadow: 0 0 0 5px rgba(21,128,61,0); }
         }
         .buy-pulse { animation: buyPulse 1.8s ease-in-out infinite; }
+        .yf-chart-link { transition: color 0.15s, opacity 0.15s; }
+        .yf-chart-link:hover { color: #C9A84C !important; opacity: 1 !important; text-decoration: underline; }
       `}</style>
       {/* Nav */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', rowGap: 8 }}>
@@ -482,8 +488,9 @@ export default function Page() {
                 <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
                   {enrichRow.dayChangePct >= 0 ? '+' : ''}{enrichRow.dayChangePct?.toFixed(2)}% 前日比
                 </div>
-                <a href={`https://finance.yahoo.com/quote/${enrichRow.ticker}`} target="_blank" rel="noopener noreferrer"
-                  style={{ fontSize: 10, color: '#64748B' }}>Yahoo Finance ↗</a>
+                <a href={`https://finance.yahoo.com/quote/${enrichRow.ticker}/chart`} target="_blank" rel="noopener noreferrer"
+                  className="yf-chart-link"
+                  style={{ fontSize: 10, color: '#64748B' }}>📈 Chart ↗</a>
               </div>
             </div>
             {/* Body */}
