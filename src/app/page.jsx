@@ -56,11 +56,11 @@ const RANK_DEFS = [
 const SCORE_BREAKDOWN = [
   { label: '売上成長率 YoY',   max: 45, desc: '+50%以上 → +45pt ★最優先' },
   { label: '小型株プレミアム', max: 25, desc: '$2B以下 → +25pt'            },
-  { label: 'グロス利益率',     max: 15, desc: '70%以上 → +15pt'            },
+  { label: 'グロス利益率',     max: 20, desc: '70%以上 → +20pt'            },
   { label: '52W高値近接',      max: 10, desc: '高値0% → +10pt'             },
   { label: 'PSR',              max: 10, desc: '5倍未満 → +10pt'            },
-  { label: '出来高急増',       max:  8, desc: '4x以上 → +8pt'              },
-  { label: '前日モメンタム',   max:  4, desc: '+7%以上 → +4pt'             },
+  { label: '出来高急増',       max:  5, desc: '4x以上 → +5pt'              },
+  { label: '前日モメンタム',   max:  2, desc: '+5%以上 → +2pt'             },
 ];
 function scoreRank(score) {
   return RANK_DEFS.find(r => {
@@ -585,7 +585,7 @@ export default function Page() {
                             {fundData.grossMargin != null ? fundData.grossMargin.toFixed(1) + '%' : '—'}
                           </div>
                           {fundData.grossMargin != null && <div style={{ fontSize: 9, fontWeight: 600, marginTop: 2, color: fundData.grossMargin >= 70 ? '#15803D' : fundData.grossMargin >= 50 ? '#D97706' : '#94A3B8' }}>
-                            {fundData.grossMargin >= 70 ? '+15pt SaaS級' : fundData.grossMargin >= 50 ? '+8pt' : fundData.grossMargin >= 30 ? '+3pt' : '+0pt'}
+                            {fundData.grossMargin >= 70 ? '+20pt SaaS級' : fundData.grossMargin >= 50 ? '+10pt' : fundData.grossMargin >= 30 ? '+4pt' : '+0pt'}
                           </div>}
                         </div>
                       </div>
