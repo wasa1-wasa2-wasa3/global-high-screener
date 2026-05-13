@@ -179,7 +179,7 @@ function ScanRow({ row, rank, watchlist, onWatch, usdJpy, onEnrich }) {
             style={{ color: NAVY, fontWeight: 700, fontSize: 14, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', textDecorationStyle: 'dotted' }}>
             {row.ticker}
           </button>
-          <a href={`https://finance.yahoo.com/quote/${row.ticker}/chart`} target="_blank" rel="noopener noreferrer"
+          <a href={`https://finance.yahoo.co.jp/quote/${row.ticker}/chart`} target="_blank" rel="noopener noreferrer"
             className="yf-chart-link"
             title={`${row.ticker} チャートを開く`}
             style={{ fontSize: 11, color: '#94A3B8', textDecoration: 'none', opacity: 0.7 }}>📈</a>
@@ -248,7 +248,7 @@ function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich }) {
               style={{ color: GOLD, fontWeight: 700, fontSize: 19, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', textDecorationStyle: 'dotted', textDecorationColor: GOLD }}>
               {row.ticker}
             </button>
-            <a href={`https://finance.yahoo.com/quote/${row.ticker}/chart`} target="_blank" rel="noopener noreferrer"
+            <a href={`https://finance.yahoo.co.jp/quote/${row.ticker}/chart`} target="_blank" rel="noopener noreferrer"
               className="yf-chart-link"
               title={`${row.ticker} チャートを開く`}
               style={{ fontSize: 12, color: '#94A3B8', textDecoration: 'none', opacity: 0.8 }}>📈Chart</a>
@@ -488,7 +488,7 @@ export default function Page() {
                 <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
                   {enrichRow.dayChangePct >= 0 ? '+' : ''}{enrichRow.dayChangePct?.toFixed(2)}% 前日比
                 </div>
-                <a href={`https://finance.yahoo.com/quote/${enrichRow.ticker}/chart`} target="_blank" rel="noopener noreferrer"
+                <a href={`https://finance.yahoo.co.jp/quote/${enrichRow.ticker}/chart`} target="_blank" rel="noopener noreferrer"
                   className="yf-chart-link"
                   style={{ fontSize: 10, color: '#64748B' }}>📈 Chart ↗</a>
               </div>
