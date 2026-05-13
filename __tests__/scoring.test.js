@@ -103,14 +103,14 @@ describe('marketCap 小型株プレミアム', () => {
 // ─── グロス利益率 ─────────────────────────────────────────────────────────────
 
 describe('grossMargin ブラケット', () => {
-  it('70% → 15pt', () => {
-    expect(calcScore({ grossMargin: 70 })).toBe(15);
+  it('70% → 20pt', () => {
+    expect(calcScore({ grossMargin: 70 })).toBe(20);
   });
-  it('50% → 8pt', () => {
-    expect(calcScore({ grossMargin: 50 })).toBe(8);
+  it('50% → 10pt', () => {
+    expect(calcScore({ grossMargin: 50 })).toBe(10);
   });
-  it('30% → 3pt', () => {
-    expect(calcScore({ grossMargin: 30 })).toBe(3);
+  it('30% → 4pt', () => {
+    expect(calcScore({ grossMargin: 30 })).toBe(4);
   });
   it('29% → 0pt', () => {
     expect(calcScore({ grossMargin: 29 })).toBe(0);
@@ -226,13 +226,13 @@ describe('≤$2B 超小型マルチプライヤー × 1.2', () => {
   });
 });
 
-// ─── Rev YoY > 50% → 最低 B 保証 ─────────────────────────────────────────────
+// ─── Rev YoY > 50% → 最低 B 保証（63pt マージン付き）────────────────────────
 
-describe('Rev YoY > 50% → 最低ランク B (score ≥ 60)', () => {
-  it('Rev 51% / marketCap なし → floor 発動 → 60pt', () => {
-    // 45pt のみ → floor → 60
+describe('Rev YoY > 50% → 最低ランク B (score ≥ 63)', () => {
+  it('Rev 51% / marketCap なし → floor 発動 → 63pt', () => {
+    // 45pt のみ → floor → 63
     const score = calcScore({ revenueGrowthYoy: 51 });
-    expect(score).toBe(60);
+    expect(score).toBe(63);
     expect(scoreRankLabel(score)).toBe('B');
   });
   it('Rev 50% ちょうど → floor 対象外（>50% が条件）', () => {
@@ -240,7 +240,7 @@ describe('Rev YoY > 50% → 最低ランク B (score ≥ 60)', () => {
     expect(calcScore({ revenueGrowthYoy: 50 })).toBe(45);
   });
   it('Rev 70% / $15B → floor + $20B以下のため B を超えられる', () => {
-    // 45+6 = 51 → floor → 60 → no $20B cap ($15B < $20B) → 60 → B
+    // 45+6 = 51 → floor → 63 → no $20B cap ($15B < $20B) → B
     const score = calcScore({ marketCap: 1.5e10, revenueGrowthYoy: 70 });
     expect(score).toBeGreaterThanOrEqual(60);
   });
@@ -250,7 +250,6 @@ describe('Rev YoY > 50% → 最低ランク B (score ≥ 60)', () => {
 
 describe('$20B超 → score ≤ 69 (B以下)', () => {
   it('$20.1B / 全指標最大 → Bキャップ (score = 69)', () => {
-    // raw: 45+6+15+10+10+8+4 = 98 → cap → 69
     const score = calcScore({
       marketCap: 2.01e10,
       revenueGrowthYoy: 100, grossMargin: 90,
@@ -269,7 +268,6 @@ describe('$20B超 → score ≤ 69 (B以下)', () => {
       volume: 5000000, volAvg: 1000000,
       dayChangePct: 10, psr: 1,
     });
-    // raw = 98 → no cap → S
     expect(score).toBeGreaterThan(69);
   });
 });
@@ -300,5 +298,90 @@ describe('成長効率ボーナス: Rev YoY ≥ 30% かつ PSR < 15 → +8pt', (
   });
   it('PSR null → ボーナス非適用', () => {
     expect(calcScore({ revenueGrowthYoy: 50 })).toBe(45); // Rev 45pt only
+  });
+});
+
+// ─── 品質アンカー: Rev≥20% + GM≥70% → 最低 B 保証 ──────────────────────────
+
+describe('品質アンカー: Rev YoY ≥ 20% かつ GM ≥ 70% → score ≥ 63 (B安定)', () => {
+  it('Rev 25% / GM 72% / $9B → ファンダ基盤のみで B 維持', () => {
+    // ASND 相当: Rev 15pt + $9B 14pt + GM 20pt + PSR 7pt = 56pt → アンカー → 63pt → B
+    const score = calcScore({
+      revenueGrowthYoy: 25,
+      marketCap: 9e9,
+      grossMargin: 72,
+      psr: 8,
+    });
+    expect(score).toBeGreaterThanOrEqual(63);
+    expect(scoreRankLabel(score)).toBe('B');
+  });
+
+  it('Rev 25% / GM 72% / $9B — 株価調整日（52W高値遠、出来高低）でも B 維持', () => {
+    // 日足ノイズゼロでもアンカーが B を保証
+    const score = calcScore({
+      revenueGrowthYoy: 25,
+      marketCap: 9e9,
+      grossMargin: 72,
+      psr: 8,
+      price: 95, week52High: 100,  // 95% — 加点なし
+      volume: 800000, volAvg: 1000000,  // 0.8x — 加点なし
+      dayChangePct: -0.5,  // 下落 — 加点なし
+    });
+    expect(score).toBeGreaterThanOrEqual(63);
+    expect(scoreRankLabel(score)).toBe('B');
+  });
+
+  it('Rev 19% / GM 72% → アンカー非適用（Rev < 20% が条件）', () => {
+    // Rev 19% は ブラケット 10-19% → 6pt のみ
+    const score = calcScore({ revenueGrowthYoy: 19, grossMargin: 72 });
+    expect(score).toBeLessThan(63);
+  });
+
+  it('Rev 25% / GM 69% → アンカー非適用（GM < 70% が条件）', () => {
+    const score = calcScore({ revenueGrowthYoy: 25, grossMargin: 69 });
+    expect(score).toBeLessThan(63);
+  });
+
+  it('Rev 25% / GM 72% / $25B → $20B超キャップ後も B 維持（69 ≥ 63）', () => {
+    // アンカー → 63 → $20B超キャップ min(69, 63) = 63 → B
+    const score = calcScore({
+      revenueGrowthYoy: 25,
+      marketCap: 2.5e10,
+      grossMargin: 72,
+    });
+    expect(score).toBeGreaterThanOrEqual(63);
+    expect(score).toBeLessThanOrEqual(69);
+    expect(scoreRankLabel(score)).toBe('B');
+  });
+
+  it('Rev 25% / GM 72% / $60B → $50B超キャップで D（アンカー無効）', () => {
+    // メガキャップは品質に関係なく D
+    const score = calcScore({
+      revenueGrowthYoy: 25,
+      marketCap: 6e10,
+      grossMargin: 72,
+    });
+    expect(score).toBeLessThanOrEqual(10);
+    expect(scoreRankLabel(score)).toBe('D');
+  });
+});
+
+// ─── ノイズ抑制: 出来高・モメンタムの上限確認 ────────────────────────────────
+
+describe('出来高急増 (0-5pt) / 前日モメンタム (0-2pt) — ノイズ抑制', () => {
+  it('出来高 4x → 最大 5pt', () => {
+    const base = calcScore({});
+    const withVol = calcScore({ volume: 4000000, volAvg: 1000000 });
+    expect(withVol - base).toBe(5);
+  });
+  it('前日 +10% → 最大 2pt', () => {
+    const base = calcScore({});
+    const withDc = calcScore({ dayChangePct: 10 });
+    expect(withDc - base).toBe(2);
+  });
+  it('出来高+モメンタム合計の最大は 7pt（旧 12pt から削減）', () => {
+    const base = calcScore({});
+    const withBoth = calcScore({ volume: 4000000, volAvg: 1000000, dayChangePct: 10 });
+    expect(withBoth - base).toBe(7);
   });
 });

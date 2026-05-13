@@ -4,24 +4,24 @@
  * 加点ブラケット（Phase 3 でスキャン時に全データ取得済み）:
  *   1. 売上成長率 YoY      0-45pt  最優先
  *   2. 小型株プレミアム    0-25pt  $10B以下に傾斜
- *   3. グロス利益率        0-15pt
+ *   3. グロス利益率        0-20pt  ← 15pt から増量（高収益企業の安定評価）
  *   4. 52週高値近接        0-10pt
  *   5. PSR                 0-10pt
- *   6. 出来高急増          0-8pt
- *   7. 前日モメンタム      0-4pt
+ *   6. 出来高急増          0-5pt   ← 8pt から削減（ノイズ抑制）
+ *   7. 前日モメンタム      0-2pt   ← 4pt から削減（ノイズ抑制）
  *   8. 成長効率ボーナス    0-8pt  Rev≥30% かつ PSR<15（成長×割安）
  *
  * ポスト補正（加点後に適用）:
  *   A. ≤$2B 超小型マルチプライヤー × 1.2
- *   B. Rev YoY > 50% → 最低ランク B 保証（score ≥ 60）
- *   C. $20B超 → B以下に制限（score ≤ 69）
- *   D. $50B超 → 強制 D（score ≤ 10）
+ *   B. Rev YoY > 50% → 最低ランク B 保証（score ≥ 63）
+ *   C. 品質アンカー: Rev≥20% かつ GM≥70% → 最低ランク B 保証（score ≥ 63）
+ *   D. $20B超 → B以下に制限（score ≤ 69）
+ *   E. $50B超 → 強制 D（score ≤ 10）
  */
 export function calcScore(row) {
   let score = 0;
 
   // 1. 売上成長率 YoY (0-45pt) — 最優先
-  // revenueGrowthYoy: % 単位 (50 = 50%)
   const rg = row.revenueGrowthYoy;
   if (rg != null) {
     if      (rg >= 50) score += 45;
@@ -37,16 +37,14 @@ export function calcScore(row) {
     else if (mc <= 5e9)   score += 20;  // $2-5B 小型
     else if (mc <= 1e10)  score += 14;  // $5-10B 中小型
     else if (mc <= 5e10)  score += 6;   // $10-50B 中型
-    // $50B超 = 加点なし (mega/large cap)
   }
 
-  // 3. グロス利益率 (0-15pt) — SaaS・ソフトウェアの高収益構造を評価
-  // grossMargin: % 単位 (70 = 70%)
+  // 3. グロス利益率 (0-20pt) — SaaS・ソフトウェアの高収益構造を評価
   const gm = row.grossMargin;
   if (gm != null) {
-    if      (gm >= 70) score += 15;
-    else if (gm >= 50) score += 8;
-    else if (gm >= 30) score += 3;
+    if      (gm >= 70) score += 20;
+    else if (gm >= 50) score += 10;
+    else if (gm >= 30) score += 4;
   }
 
   // 4. 52週高値近接 (0-10pt) — ブレイクアウトタイミング
@@ -59,7 +57,6 @@ export function calcScore(row) {
   }
 
   // 5. PSR (Price-to-Sales Ratio, 0-10pt) — 成長株バリュエーション
-  // PSR < 20 = 健全。>40 = バブル圏
   const psr = row.psr;
   if (psr != null && psr > 0) {
     if      (psr < 5)   score += 10;
@@ -68,22 +65,19 @@ export function calcScore(row) {
     else if (psr < 40)  score += 1;
   }
 
-  // 6. 出来高急増 (0-8pt) — 機関投資家参戦シグナル
+  // 6. 出来高急増 (0-5pt) — 機関投資家参戦シグナル（ノイズ抑制のため上限削減）
   if (row.volAvg > 0) {
     const vr = row.volume / row.volAvg;
-    if      (vr >= 4.0) score += 8;
-    else if (vr >= 3.0) score += 6;
-    else if (vr >= 2.0) score += 4;
-    else if (vr >= 1.5) score += 2;
-    else if (vr >= 1.2) score += 1;
+    if      (vr >= 4.0) score += 5;
+    else if (vr >= 3.0) score += 3;
+    else if (vr >= 2.0) score += 2;
+    else if (vr >= 1.5) score += 1;
   }
 
-  // 7. 前日上昇モメンタム (0-4pt)
+  // 7. 前日上昇モメンタム (0-2pt) — 単日ノイズの影響を最小化
   const dc = row.dayChangePct || 0;
-  if      (dc >= 7)  score += 4;
-  else if (dc >= 5)  score += 3;
-  else if (dc >= 3)  score += 2;
-  else if (dc >= 1)  score += 1;
+  if      (dc >= 5) score += 2;
+  else if (dc >= 1) score += 1;
 
   // 8. 成長効率ボーナス (0-8pt): Rev YoY ≥ 30% かつ PSR < 15 = 成長に対して割安
   if ((rg || 0) >= 30 && psr != null && psr > 0 && psr < 15) score += 8;
@@ -93,13 +87,16 @@ export function calcScore(row) {
   // A. ≤$2B 超小型マルチプライヤー × 1.2（10倍成長の余地が最も大きいため）
   if (mc > 0 && mc <= 2e9) result = Math.min(100, Math.round(result * 1.2));
 
-  // B. Rev YoY > 50% = 成長最優先 → 最低 B ランク保証（score ≥ 60）
-  if ((rg || 0) > 50 && result < 60) result = 60;
+  // B. Rev YoY > 50% = 成長最優先 → 最低 B ランク保証（score ≥ 63、3pt マージン付き）
+  if ((rg || 0) > 50 && result < 63) result = 63;
 
-  // C. $20B超 = 10倍成長の余地なし → B以下に制限（score ≤ 69）
+  // C. 品質アンカー: Rev≥20% かつ GM≥70% → 株価調整があっても最低 B を維持（score ≥ 63）
+  if ((rg || 0) >= 20 && (gm || 0) >= 70 && result < 63) result = 63;
+
+  // D. $20B超 = 10倍成長の余地なし → B以下に制限（score ≤ 69）
   if (mc > 2e10 && mc <= 5e10) result = Math.min(69, result);
 
-  // D. $50B超 = マルチバガー不適格 → 強制 D（score ≤ 10）
+  // E. $50B超 = マルチバガー不適格 → 強制 D（score ≤ 10）
   if (mc > 5e10) return Math.min(10, result);
 
   return result;
