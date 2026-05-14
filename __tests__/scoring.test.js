@@ -366,6 +366,43 @@ describe('品質アンカー: Rev YoY ≥ 20% かつ GM ≥ 70% → score ≥ 63
   });
 });
 
+// ─── クロスファクター G: mc < $10B かつ Rev YoY > 50% → 最低 A 保証 ─────────
+
+describe('クロスファクター G: mc < $10B かつ Rev YoY > 50% → score ≥ 70 (A)', () => {
+  it('Rev 60% / $5B → G 発動 → ≥ 70pt (A)', () => {
+    // 45 (rev) + 20 (cap $2-5B) = 65 → B floor 63 → G floor 70
+    const score = calcScore({ revenueGrowthYoy: 60, marketCap: 5e9 });
+    expect(score).toBeGreaterThanOrEqual(70);
+    expect(scoreRankLabel(score)).toBe('A');
+  });
+  it('Rev 55% / $9B → G 発動 → ≥ 70pt (A)', () => {
+    // 45 + 14 = 59 → B floor 63 → G floor 70
+    const score = calcScore({ revenueGrowthYoy: 55, marketCap: 9e9 });
+    expect(score).toBeGreaterThanOrEqual(70);
+  });
+  it('Rev 50% ちょうど / $5B → G 非適用（> 50% が条件）', () => {
+    // 45 + 20 = 65 → B floor 非適用（> 50% でなく = 50%）→ G 非適用 → 65
+    const score = calcScore({ revenueGrowthYoy: 50, marketCap: 5e9 });
+    expect(score).toBeLessThan(70);
+  });
+  it('Rev 60% / $10B ちょうど → G 非適用（< $10B が条件）', () => {
+    // 45 + 14 = 59 → B floor → 63（G は mc < $10B が必要）
+    const score = calcScore({ revenueGrowthYoy: 60, marketCap: 1e10 });
+    expect(score).toBe(63);
+  });
+  it('Rev 60% / $15B → G 非適用 → B floor のみ', () => {
+    // 45 + 6 = 51 → B floor → 63（mc $15B は G 対象外）
+    const score = calcScore({ revenueGrowthYoy: 60, marketCap: 1.5e10 });
+    expect(score).toBeGreaterThanOrEqual(63);
+    expect(score).toBeLessThan(70);
+  });
+  it('Rev 60% / $2B → ×1.2 マルチプライヤー優先で S', () => {
+    // 45 + 25 = 70 → ×1.2 = 84 → G は既に超えているので影響なし
+    const score = calcScore({ revenueGrowthYoy: 60, marketCap: 2e9 });
+    expect(score).toBeGreaterThanOrEqual(80);
+  });
+});
+
 // ─── ノイズ抑制: 出来高・モメンタムの上限確認 ────────────────────────────────
 
 describe('出来高急増 (0-5pt) / 前日モメンタム (0-2pt) — ノイズ抑制', () => {

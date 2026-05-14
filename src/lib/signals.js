@@ -40,5 +40,10 @@ export function getSignals(row) {
     signals.push({ type: 'deepValue', icon: '💎', label: 'DEEP VALUE', color: '#7C3AED' });
   }
 
+  // 🏝️ Island Reversal Bottom: gap-down → isolated island → gap-up reversal
+  if (row.islandReversal) {
+    signals.push({ type: 'island', icon: '🏝️', label: 'アイランド底', color: '#0891B2' });
+  }
+
   return signals;
 }

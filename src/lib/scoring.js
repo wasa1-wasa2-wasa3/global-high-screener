@@ -15,6 +15,7 @@
  *   A. ≤$2B 超小型マルチプライヤー × 1.2
  *   B. Rev YoY > 50% → 最低ランク B 保証（score ≥ 63）
  *   C. 品質アンカー: Rev≥20% かつ GM≥70% → 最低ランク B 保証（score ≥ 63）
+ *   G. クロスファクター: mc < $10B かつ Rev YoY > 50% → 最低ランク A 保証（score ≥ 70）
  *   D. $20B超 → B以下に制限（score ≤ 69）
  *   E. $50B超 → 強制 D（score ≤ 10）
  */
@@ -92,6 +93,9 @@ export function calcScore(row) {
 
   // C. 品質アンカー: Rev≥20% かつ GM≥70% → 株価調整があっても最低 B を維持（score ≥ 63）
   if ((rg || 0) >= 20 && (gm || 0) >= 70 && result < 63) result = 63;
+
+  // G. クロスファクター: mc < $10B かつ Rev YoY > 50% → 小型高成長の最低 A 保証（score ≥ 70）
+  if (mc > 0 && mc < 1e10 && (rg || 0) > 50 && result < 70) result = 70;
 
   // D. $20B超 = 10倍成長の余地なし → B以下に制限（score ≤ 69）
   if (mc > 2e10 && mc <= 5e10) result = Math.min(69, result);

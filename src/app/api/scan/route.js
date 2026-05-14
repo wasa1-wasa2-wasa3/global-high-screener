@@ -6,7 +6,7 @@ const BATCH     = 50;
 const CONCURRENT = 6;
 const THRESHOLD  = 0.95;
 const MIN_CAP          = 1_000_000_000;  // $1B  — 下限
-const MAX_CAP          = 20_000_000_000; // $20B — 上限（マルチバガー不適格ライン）
+const MAX_CAP          = 50_000_000_000; // $50B — Mid-Cap 上限
 const MIN_REV_YOY      = 15;   // Rev YoY +15% 未満は除外
 const MAX_PSR          = 25;   // PSR 25倍超 = 投機バブル、除外
 const MIN_VOL_AVG      = 200_000; // 日平均20万株未満 = 流動性不足、除外
@@ -119,6 +119,43 @@ async function batchFetchWithConcurrency(symbols, crumb, cookie) {
     results.push(...chunk.flat());
   }
   return results;
+}
+
+// ─── Island Reversal 検知 ────────────────────────────────────────────────────
+
+async function fetchChartOhlc(ticker) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=7d`;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 5000);
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': UA }, signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const result = data?.chart?.result?.[0];
+    if (!result?.indicators?.quote?.[0]) return null;
+    const { open, high, low, close } = result.indicators.quote[0];
+    return open.map((o, i) => ({ open: o, high: high[i], low: low[i], close: close[i] }))
+      .filter(r => r.open != null && r.high != null && r.low != null && r.close != null);
+  } catch {
+    clearTimeout(timer);
+    return null;
+  }
+}
+
+function isIslandReversal(ohlc) {
+  if (!ohlc || ohlc.length < 4) return false;
+  const n  = ohlc.at(-1);
+  const p1 = ohlc.at(-2);
+  const p2 = ohlc.at(-3);
+  const p3 = ohlc.at(-4);
+  // Gap Down: p2 opened ≥1.5% below p3's close
+  const gapDown = p2.open < p3.close * 0.985;
+  // Island: p1 stayed depressed (high didn't recover into pre-gap zone)
+  const isolated = p1.high < p3.close * 0.99;
+  // Gap Up: today opened above p1's high
+  const gapUp = n.open > p1.high;
+  return gapDown && isolated && gapUp;
 }
 
 // ─── セクター正規化 ────────────────────────────────────────────────────────
@@ -298,6 +335,16 @@ export async function POST() {
       )
       .sort((a, b) => b.score - a.score)
       .slice(0, 25);
+
+    // Phase 4: Island Reversal 検知（最終25件を並列フェッチ）
+    await Promise.all(rows.map(async row => {
+      try {
+        const ohlc = await fetchChartOhlc(row.ticker);
+        row.islandReversal = isIslandReversal(ohlc);
+        if (row.islandReversal) row.score = Math.min(100, row.score + 5);
+      } catch { row.islandReversal = false; }
+    }));
+    rows.sort((a, b) => b.score - a.score);
 
     return Response.json({
       rows,

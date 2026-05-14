@@ -421,12 +421,11 @@ export default function Page() {
     setWatchRefreshing(false);
   }
 
-  // API は $1B–$20B のみ返す。クライアント側フィルタもそれに合わせて再定義
   const capRanges = {
     all:   { min: 0,    max: Infinity },
-    micro: { min: 1e9,  max: 2e9  },  // $1B–$2B 超小型（×1.2 マルチプライヤー対象）
-    small: { min: 2e9,  max: 1e10 },  // $2B–$10B 小型
-    mid:   { min: 1e10, max: 2e10 },  // $10B–$20B 中小型（API 上限）
+    micro: { min: 1e9,  max: 2e9  },  // $1B–$2B Micro-Cap（×1.2 マルチプライヤー対象）
+    small: { min: 2e9,  max: 1e10 },  // $2B–$10B Small-Cap
+    mid:   { min: 1e10, max: 5e10 },  // $10B–$50B Mid-Cap
   };
   const { min: capMin, max: capMax } = capRanges[capFilter] || capRanges.all;
 
@@ -664,10 +663,10 @@ export default function Page() {
         {scannedAt && <span style={{ fontSize: 12, color: '#888' }}>最終: {new Date(scannedAt).toLocaleString('ja-JP')}</span>}
         <select value={capFilter} onChange={e => setCapFilter(e.target.value)}
           style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 13, cursor: 'pointer', minHeight: 44 }}>
-          <option value="all">規模: すべて ($1B–$20B)</option>
-          <option value="micro">超小型 ($1B–$2B) ×1.2 ボーナス</option>
-          <option value="small">小型 ($2B–$10B)</option>
-          <option value="mid">中小型 ($10B–$20B)</option>
+          <option value="all">規模: すべて ($1B–$50B)</option>
+          <option value="micro">Micro-Cap ($1B–$2B) ×1.2 ボーナス</option>
+          <option value="small">Small-Cap ($2B–$10B)</option>
+          <option value="mid">Mid-Cap ($10B–$50B)</option>
         </select>
         {sectors.length > 2 && (
           <select value={sectorFilter} onChange={e => setSectorFilter(e.target.value)}
@@ -731,7 +730,7 @@ export default function Page() {
                 マルチバガー候補が見つかりませんでした
               </p>
               <p style={{ fontSize: 13, lineHeight: 1.7, maxWidth: 360, margin: '0 auto', color: '#94A3B8' }}>
-                時価総額 $1B〜$20B かつ 売上成長率 +15% 以上の条件を<br />
+                時価総額 $1B〜$50B かつ 売上成長率 +15% 以上の条件を<br />
                 満たす52週高値圏の銘柄が現在存在しません。<br />
                 時間をおいて再スキャンしてください。
               </p>

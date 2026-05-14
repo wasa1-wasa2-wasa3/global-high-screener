@@ -14,6 +14,38 @@ async function getCrumb() {
   return { crumb, cookie: cookieStr };
 }
 
+async function fetchChartOhlc(ticker) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=7d`;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 5000);
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': UA }, signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const result = data?.chart?.result?.[0];
+    if (!result?.indicators?.quote?.[0]) return null;
+    const { open, high, low, close } = result.indicators.quote[0];
+    return open.map((o, i) => ({ open: o, high: high[i], low: low[i], close: close[i] }))
+      .filter(r => r.open != null && r.high != null && r.low != null && r.close != null);
+  } catch {
+    clearTimeout(timer);
+    return null;
+  }
+}
+
+function isIslandReversal(ohlc) {
+  if (!ohlc || ohlc.length < 4) return false;
+  const n  = ohlc.at(-1);
+  const p1 = ohlc.at(-2);
+  const p2 = ohlc.at(-3);
+  const p3 = ohlc.at(-4);
+  const gapDown = p2.open < p3.close * 0.985;
+  const isolated = p1.high < p3.close * 0.99;
+  const gapUp = n.open > p1.high;
+  return gapDown && isolated && gapUp;
+}
+
 async function fetchFundamentals(ticker, crumb, cookie) {
   const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}`
     + `?modules=financialData&crumb=${encodeURIComponent(crumb)}`;
@@ -47,22 +79,28 @@ export async function POST(request) {
 
     const { crumb, cookie } = await getCrumb();
 
-    // 相場データと財務データを並列取得
-    const [quotesRes, fundResults] = await Promise.all([
+    // 相場データ・財務データ・チャートOHLCを並列取得
+    const [quotesRes, fundResults, chartResults] = await Promise.all([
       fetch(
         `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${tickers.join(',')}&crumb=${encodeURIComponent(crumb)}`,
         { headers: { 'User-Agent': UA, 'Cookie': cookie }, signal: AbortSignal.timeout(8000) }
       ),
       Promise.allSettled(tickers.map(t => fetchFundamentals(t, crumb, cookie))),
+      Promise.allSettled(tickers.map(t => fetchChartOhlc(t))),
     ]);
 
     if (!quotesRes.ok) return Response.json({ error: 'fetch failed' }, { status: 502 });
     const data = await quotesRes.json();
     const quotes = data.quoteResponse?.result || [];
 
-    // ファンダメンタルズを ticker → data のマップに変換
+    // ファンダメンタルズ・チャートを ticker → data のマップに変換
     const fundMap = {};
     fundResults.forEach(r => { if (r.status === 'fulfilled') fundMap[r.value.ticker] = r.value; });
+    const chartMap = {};
+    tickers.forEach((t, i) => {
+      const r = chartResults[i];
+      if (r.status === 'fulfilled') chartMap[t] = r.value;
+    });
 
     const rows = quotes.map(q => {
       const price      = q.regularMarketPrice;
@@ -97,6 +135,8 @@ export async function POST(request) {
         grossMargin:      fund.grossMargin ?? null,
       };
       row.score = calcScore(row);
+      row.islandReversal = isIslandReversal(chartMap[q.symbol] ?? null);
+      if (row.islandReversal) row.score = Math.min(100, row.score + 5);
       return row;
     });
 
