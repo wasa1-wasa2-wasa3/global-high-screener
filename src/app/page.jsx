@@ -82,7 +82,21 @@ const TREND_CFG = {
   exit:     { color: '#D97706', glow: 'rgba(217,119,6,0.55)',  label: 'Exit',      title: 'Exit — 大出来高でサポート割れ（黄）' },
 };
 function TrendLamp({ mode, showLabel = false }) {
-  if (!mode) return null;
+  if (!mode) {
+    // シグナルなし: ランプが「壊れていない」ことを薄いドット+テキストで明示
+    return (
+      <span title="シグナルなし — 特定のトレンド条件に非該当（通常状態）"
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0, opacity: 0.4 }}>
+        <span style={{
+          display: 'inline-block', width: 9, height: 9, borderRadius: '50%',
+          border: '1.5px solid #94A3B8', background: 'transparent',
+        }} />
+        {showLabel && (
+          <span style={{ fontSize: 10, fontWeight: 600, color: '#94A3B8' }}>Neutral</span>
+        )}
+      </span>
+    );
+  }
   const cfg = TREND_CFG[mode];
   if (!cfg) return null;
   return (
