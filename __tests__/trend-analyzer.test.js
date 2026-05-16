@@ -56,8 +56,11 @@ describe('getTrendMode', () => {
     it('volRatio 0.9x → holding 非適用（≤ 0.8x が条件）', () => {
       expect(getTrendMode({ ...base, price: 97, week52High: 100, volRatio: 0.9, dayChangePct: 0 })).toBeNull();
     });
-    it('高値-4% / 出来高枯渇 / 日次 -1.5% → holding 非適用（下落中）', () => {
-      expect(getTrendMode({ ...base, price: 96, week52High: 100, volRatio: 0.5, dayChangePct: -1.5 })).toBeNull();
+    it('高値-4% / 出来高枯渇 / 日次 -2.5% → holding（-3%超なので許容）', () => {
+      expect(getTrendMode({ ...base, price: 96, week52High: 100, volRatio: 0.5, dayChangePct: -2.5 })).toBe('holding');
+    });
+    it('高値-4% / 出来高枯渇 / 日次 -3.5% → holding 非適用（-3%以下の急落）', () => {
+      expect(getTrendMode({ ...base, price: 96, week52High: 100, volRatio: 0.5, dayChangePct: -3.5 })).toBeNull();
     });
   });
 

@@ -21,8 +21,9 @@ export function getTrendMode({ price, week52High, volRatio, dayChangePct, ma50De
   if (vr >= 2.0 && dc <= -2) return 'exit';
   if ((ma50Dev || 0) < -3 && vr >= 1.5 && dc < -1) return 'exit';
 
-  // holding: 高値圏（52W高値の5%以内）+ 出来高枯渇（0.8x以下）+ 横ばい
-  if (pct !== null && pct >= -5 && vr <= 0.8 && dc > -1) return 'holding';
+  // holding: 高値圏（52W高値の5%以内）+ 出来高枯渇（0.8x以下）+ 急落でない（-3%超）
+  // 本質は「出来高の枯渇」なので -2% 程度の小幅安は保ち合いとして許容する
+  if (pct !== null && pct >= -5 && vr <= 0.8 && dc > -3) return 'holding';
 
   return null;
 }
