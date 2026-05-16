@@ -74,6 +74,29 @@ function scoreRank(score) {
 function hasBuySignal(score, signals) {
   return score >= 70 && !signals.some(s => s.type === 'overheated');
 }
+
+// ─── Trend Lamp ──────────────────────────────────────────────────────────────
+const TREND_CFG = {
+  breakout: { color: '#DC2626', glow: 'rgba(220,38,38,0.55)', label: 'Breakout',  title: 'Breakout — 大出来高で52W高値突破（赤）' },
+  holding:  { color: '#16A34A', glow: 'rgba(22,163,74,0.55)',  label: 'Holding',   title: 'Holding — 高値圏で出来高枯渇・健全保合（緑）' },
+  exit:     { color: '#D97706', glow: 'rgba(217,119,6,0.55)',  label: 'Exit',      title: 'Exit — 大出来高でサポート割れ（黄）' },
+};
+function TrendLamp({ mode, showLabel = false }) {
+  if (!mode) return null;
+  const cfg = TREND_CFG[mode];
+  if (!cfg) return null;
+  return (
+    <span title={cfg.title} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+      <span style={{
+        display: 'inline-block', width: 9, height: 9, borderRadius: '50%',
+        background: cfg.color, boxShadow: `0 0 5px 2px ${cfg.glow}`,
+      }} />
+      {showLabel && (
+        <span style={{ fontSize: 10, fontWeight: 700, color: cfg.color }}>{cfg.label}</span>
+      )}
+    </span>
+  );
+}
 function ScoreBadge({ score }) {
   const r = scoreRank(score);
   return (
@@ -175,6 +198,7 @@ function ScanRow({ row, rank, watchlist, onWatch, usdJpy, onEnrich }) {
       </td>
       <td style={{ padding: '8px 10px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <TrendLamp mode={row.trendMode} />
           <button onClick={() => onEnrich(row)}
             style={{ color: NAVY, fontWeight: 700, fontSize: 14, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', textDecorationStyle: 'dotted' }}>
             {row.ticker}
@@ -248,6 +272,7 @@ function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich }) {
               style={{ color: GOLD, fontWeight: 700, fontSize: 19, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', textDecorationStyle: 'dotted', textDecorationColor: GOLD }}>
               {row.ticker}
             </button>
+            <TrendLamp mode={row.trendMode} showLabel />
             <a href={`https://finance.yahoo.co.jp/quote/${row.ticker}/chart`} target="_blank" rel="noopener noreferrer"
               className="yf-chart-link"
               title={`${row.ticker} チャートを開く`}

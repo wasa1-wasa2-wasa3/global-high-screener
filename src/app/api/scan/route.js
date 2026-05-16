@@ -1,5 +1,6 @@
 import staticTickers from '../../../data/tickers.json';
 import { calcScore } from '../../../lib/scoring';
+import { getTrendMode } from '../../../lib/trend-analyzer';
 
 const UA        = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)';
 const BATCH     = 50;
@@ -222,7 +223,8 @@ function mapQuote(q, meta) {
       ? new Date(q.earningsTimestamp * 1000).toISOString().slice(0, 10)
       : null,
   };
-  row.score = calcScore(row);
+  row.score     = calcScore(row);
+  row.trendMode = getTrendMode(row);
   return row;
 }
 

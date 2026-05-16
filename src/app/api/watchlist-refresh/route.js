@@ -1,4 +1,5 @@
 import { calcScore } from '../../../lib/scoring';
+import { getTrendMode } from '../../../lib/trend-analyzer';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)';
 
@@ -134,9 +135,10 @@ export async function POST(request) {
         revenueGrowthYoy: fund.revenueGrowthYoy ?? null,
         grossMargin:      fund.grossMargin ?? null,
       };
-      row.score = calcScore(row);
+      row.score          = calcScore(row);
       row.islandReversal = isIslandReversal(chartMap[q.symbol] ?? null);
       if (row.islandReversal) row.score = Math.min(100, row.score + 5);
+      row.trendMode      = getTrendMode(row);
       return row;
     });
 
