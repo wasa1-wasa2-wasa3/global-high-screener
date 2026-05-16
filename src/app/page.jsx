@@ -77,37 +77,27 @@ function hasBuySignal(score, signals) {
 
 // ─── Trend Lamp ──────────────────────────────────────────────────────────────
 const TREND_CFG = {
-  breakout: { color: '#DC2626', glow: 'rgba(220,38,38,0.55)', label: 'Breakout',  title: 'Breakout — 大出来高で52W高値突破（赤）' },
-  holding:  { color: '#16A34A', glow: 'rgba(22,163,74,0.55)',  label: 'Holding',   title: 'Holding — 高値圏で出来高枯渇・健全保合（緑）' },
-  exit:     { color: '#D97706', glow: 'rgba(217,119,6,0.55)',  label: 'Exit',      title: 'Exit — 大出来高でサポート割れ（黄）' },
+  breakout: { arrow: '↑', color: '#16A34A', label: '買い増し', title: '↑ 絶好調 — 大出来高で52W高値突破・買い増し検討' },
+  holding:  { arrow: '→', color: '#64748B', label: '保有OK',  title: '→ 保有OK — 高値圏で出来高枯渇・健全な保ち合い' },
+  exit:     { arrow: '↓', color: '#DC2626', label: '売り検討', title: '↓ 要注意 — 大出来高でサポート割れ・売り検討' },
 };
 function TrendLamp({ mode, showLabel = false }) {
   if (!mode) {
-    // シグナルなし: ランプが「壊れていない」ことを薄いドット+テキストで明示
     return (
-      <span title="シグナルなし — 特定のトレンド条件に非該当（通常状態）"
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0, opacity: 0.4 }}>
-        <span style={{
-          display: 'inline-block', width: 9, height: 9, borderRadius: '50%',
-          border: '1.5px solid #94A3B8', background: 'transparent',
-        }} />
-        {showLabel && (
-          <span style={{ fontSize: 10, fontWeight: 600, color: '#94A3B8' }}>Neutral</span>
-        )}
+      <span title="→ 様子見 — 特定のトレンドシグナルなし"
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0, color: '#CBD5E1' }}>
+        <span style={{ fontSize: 13, fontWeight: 700, lineHeight: 1 }}>→</span>
+        {showLabel && <span style={{ fontSize: 10, fontWeight: 600 }}>様子見</span>}
       </span>
     );
   }
   const cfg = TREND_CFG[mode];
   if (!cfg) return null;
   return (
-    <span title={cfg.title} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-      <span style={{
-        display: 'inline-block', width: 9, height: 9, borderRadius: '50%',
-        background: cfg.color, boxShadow: `0 0 5px 2px ${cfg.glow}`,
-      }} />
-      {showLabel && (
-        <span style={{ fontSize: 10, fontWeight: 700, color: cfg.color }}>{cfg.label}</span>
-      )}
+    <span title={cfg.title}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0, color: cfg.color }}>
+      <span style={{ fontSize: 13, fontWeight: 700, lineHeight: 1 }}>{cfg.arrow}</span>
+      {showLabel && <span style={{ fontSize: 10, fontWeight: 700 }}>{cfg.label}</span>}
     </span>
   );
 }
