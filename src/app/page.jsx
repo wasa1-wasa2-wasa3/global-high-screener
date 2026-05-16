@@ -198,7 +198,7 @@ function ScanRow({ row, rank, watchlist, onWatch, usdJpy, onEnrich }) {
       </td>
       <td style={{ padding: '8px 10px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <TrendLamp mode={row.trendMode} />
+          <TrendLamp mode={row.trendMode} showLabel />
           <button onClick={() => onEnrich(row)}
             style={{ color: NAVY, fontWeight: 700, fontSize: 14, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', textDecorationStyle: 'dotted' }}>
             {row.ticker}
