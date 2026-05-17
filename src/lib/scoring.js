@@ -10,6 +10,7 @@
  *   6. 出来高急増          0-5pt   ← 8pt から削減（ノイズ抑制）
  *   7. 前日モメンタム      0-2pt   ← 4pt から削減（ノイズ抑制）
  *   8. 成長効率ボーナス    0-8pt  Rev≥30% かつ PSR<15（成長×割安）
+ *   9. RS vs QQQ           0-8pt  1年相対強度（2x以上で満点）
  *
  * ポスト補正（加点後に適用）:
  *   A. ≤$2B 超小型マルチプライヤー × 1.2
@@ -82,6 +83,14 @@ export function calcScore(row) {
 
   // 8. 成長効率ボーナス (0-8pt): Rev YoY ≥ 30% かつ PSR < 15 = 成長に対して割安
   if ((rg || 0) >= 30 && psr != null && psr > 0 && psr < 15) score += 8;
+
+  // 9. RS vs QQQ (0-8pt): 1年相対強度 — 市場全体を大きく上回る銘柄を優遇
+  const rs = row.rs;
+  if (rs != null) {
+    if      (rs >= 2.0) score += 8;
+    else if (rs >= 1.5) score += 5;
+    else if (rs >= 1.0) score += 3;
+  }
 
   let result = Math.min(100, score);
 

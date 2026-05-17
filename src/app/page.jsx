@@ -63,6 +63,7 @@ const SCORE_BREAKDOWN = [
   { label: 'PSR',              max: 10, desc: '5倍未満 → +10pt'            },
   { label: '出来高急増',       max:  5, desc: '4x以上 → +5pt'              },
   { label: '前日モメンタム',   max:  2, desc: '+5%以上 → +2pt'             },
+  { label: 'RS vs QQQ',        max:  8, desc: '2x以上 → +8pt'              },
 ];
 function scoreRank(score) {
   return RANK_DEFS.find(r => {
@@ -158,7 +159,7 @@ function ScoreHeaderPopover() {
             ))}
           </div>
           <div style={{ padding: '8px 16px 14px', borderTop: '1px solid #F1F5F9', marginTop: 4 }}>
-            <div style={{ fontSize: 9, letterSpacing: 2, color: '#94A3B8', fontWeight: 700, marginBottom: 8 }}>SCORE BREAKDOWN（合計 100pt）</div>
+            <div style={{ fontSize: 9, letterSpacing: 2, color: '#94A3B8', fontWeight: 700, marginBottom: 8 }}>SCORE BREAKDOWN（各要素の最大加点・上限100pt）</div>
             {SCORE_BREAKDOWN.map(b => (
               <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <span style={{ fontSize: 11, color: '#374151', fontWeight: 600 }}>{b.label}</span>
@@ -174,13 +175,19 @@ function ScoreHeaderPopover() {
     </div>
   );
 }
-function SignalBadges({ score, signals, specialDividend }) {
+function SignalBadges({ score, signals, specialDividend, rs }) {
   const buy = hasBuySignal(score, signals);
   return (
     <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center' }}>
       {buy && (
         <span className="buy-pulse" style={{ fontSize: 11, padding: '3px 8px', borderRadius: 5, background: '#DCFCE7', color: '#15803D', fontWeight: 700, border: '1px solid #86EFAC', whiteSpace: 'nowrap' }}>
           🟢 BUY
+        </span>
+      )}
+      {rs != null && rs >= 1.5 && (
+        <span title={`RS vs QQQ: ${rs.toFixed(2)}x — 過去1年でQQQの${rs.toFixed(1)}倍のリターン`}
+          style={{ fontSize: 11, padding: '2px 6px', borderRadius: 5, background: '#EFF6FF', color: '#1D4ED8', fontWeight: 700, border: '1px solid #93C5FD', whiteSpace: 'nowrap' }}>
+          📈 RS {rs.toFixed(1)}x
         </span>
       )}
       {signals.map(s => (
@@ -263,13 +270,18 @@ function ScanRow({ row, rank, watchlist, onWatch, usdJpy, onEnrich,
           fontWeight: row.revenueGrowthYoy != null && row.revenueGrowthYoy >= 30 ? 700 : 400,
           color: row.revenueGrowthYoy != null ? (row.revenueGrowthYoy >= 50 ? '#15803D' : row.revenueGrowthYoy >= 20 ? '#D97706' : '#64748B') : '#CBD5E1' }}>
           {row.revenueGrowthYoy != null ? (row.revenueGrowthYoy >= 0 ? '+' : '') + row.revenueGrowthYoy.toFixed(1) + '%' : '—'}
+          {row.revCAGR3Y != null && (
+            <div style={{ fontSize: 10, color: '#94A3B8', marginTop: 1, fontWeight: 400 }}>
+              CAGR: {row.revCAGR3Y >= 0 ? '+' : ''}{row.revCAGR3Y.toFixed(1)}%
+            </div>
+          )}
         </td>
         <td style={{ padding: '8px 10px', fontSize: 12,
           color: row.grossMargin != null ? (row.grossMargin >= 70 ? '#15803D' : row.grossMargin >= 50 ? '#D97706' : '#64748B') : '#CBD5E1' }}>
           {row.grossMargin != null ? row.grossMargin.toFixed(1) + '%' : '—'}
         </td>
         <td style={{ padding: '8px 10px' }}>
-          <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} />
+          <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} rs={row.rs} />
         </td>
         <td style={{ padding: '8px 10px', textAlign: 'center' }}>
           <ScoreBadge score={row.score} />
@@ -310,11 +322,12 @@ function ScanRow({ row, rank, watchlist, onWatch, usdJpy, onEnrich,
 }
 
 // ─── Mobile card ───────────────────────────────────────────────────────────
-function MetricCell({ label, value, color = '#374151', bg = '#F8FAFC' }) {
+function MetricCell({ label, value, color = '#374151', bg = '#F8FAFC', sub = null }) {
   return (
     <div style={{ background: bg, borderRadius: 8, padding: '7px 10px' }}>
       <div style={{ fontSize: 10, color: '#94A3B8', marginBottom: 2 }}>{label}</div>
       <div style={{ fontSize: 14, fontWeight: 700, color }}>{value}</div>
+      {sub && <div style={{ fontSize: 10, color: '#94A3B8', marginTop: 1 }}>{sub}</div>}
     </div>
   );
 }
@@ -380,13 +393,14 @@ function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich,
           <MetricCell label="Rev YoY"
             value={row.revenueGrowthYoy != null ? (row.revenueGrowthYoy >= 0 ? '+' : '') + row.revenueGrowthYoy.toFixed(1) + '%' : '—'}
             color={row.revenueGrowthYoy != null ? (row.revenueGrowthYoy >= 50 ? '#15803D' : row.revenueGrowthYoy >= 20 ? '#D97706' : '#64748B') : '#CBD5E1'}
-            bg={row.revenueGrowthYoy != null && row.revenueGrowthYoy >= 30 ? '#ECFDF5' : '#F8FAFC'} />
+            bg={row.revenueGrowthYoy != null && row.revenueGrowthYoy >= 30 ? '#ECFDF5' : '#F8FAFC'}
+            sub={row.revCAGR3Y != null ? `CAGR: ${row.revCAGR3Y >= 0 ? '+' : ''}${row.revCAGR3Y.toFixed(1)}%` : null} />
           <MetricCell label="Gross Mg"
             value={row.grossMargin != null ? row.grossMargin.toFixed(1) + '%' : '—'}
             color={row.grossMargin != null ? (row.grossMargin >= 70 ? '#15803D' : row.grossMargin >= 50 ? '#D97706' : '#64748B') : '#CBD5E1'}
             bg={row.grossMargin != null && row.grossMargin >= 70 ? '#ECFDF5' : '#F8FAFC'} />
         </div>
-        <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} />
+        <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} rs={row.rs} />
         {isWatchTab && row.trendMode === 'breakout' && (
           <button onClick={() => onBuyToggle(row.ticker)}
             style={{ marginTop: 10, width: '100%', padding: '9px', borderRadius: 8, background: isBuying ? '#DCFCE7' : '#F0FDF4', color: '#15803D', border: '1px solid #86EFAC', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>

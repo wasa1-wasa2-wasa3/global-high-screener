@@ -16,7 +16,7 @@ async function getCrumb() {
 }
 
 async function fetchChartOhlc(ticker) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=7d`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y`;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 5000);
   try {
@@ -49,7 +49,7 @@ function isIslandReversal(ohlc) {
 
 async function fetchFundamentals(ticker, crumb, cookie) {
   const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}`
-    + `?modules=financialData&crumb=${encodeURIComponent(crumb)}`;
+    + `?modules=financialData,incomeStatementHistory&crumb=${encodeURIComponent(crumb)}`;
   const ctrl  = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 5000);
   try {
@@ -57,14 +57,27 @@ async function fetchFundamentals(ticker, crumb, cookie) {
     clearTimeout(timer);
     if (!res.ok) return { ticker };
     const data = await res.json();
-    const fd = data.quoteSummary?.result?.[0]?.financialData;
+    const result = data.quoteSummary?.result?.[0];
+    const fd = result?.financialData;
     if (!fd) return { ticker };
+
+    const hist = result?.incomeStatementHistory?.incomeStatementHistory;
+    let revCAGR3Y = null;
+    if (hist && hist.length >= 2) {
+      const revs = hist.map(y => y.totalRevenue?.raw).filter(r => r != null && r > 0);
+      if (revs.length >= 2) {
+        const n = revs.length - 1;
+        revCAGR3Y = Math.round((Math.pow(revs[0] / revs[n], 1 / n) - 1) * 1000) / 10;
+      }
+    }
+
     return {
       ticker,
       revenueGrowthYoy: fd.revenueGrowth?.raw != null
         ? Math.round(fd.revenueGrowth.raw * 1000) / 10 : null,
       grossMargin: fd.grossMargins?.raw != null
         ? Math.round(fd.grossMargins.raw * 1000) / 10 : null,
+      revCAGR3Y,
     };
   } catch {
     clearTimeout(timer);
@@ -80,15 +93,19 @@ export async function POST(request) {
 
     const { crumb, cookie } = await getCrumb();
 
-    // 相場データ・財務データ・チャートOHLCを並列取得
-    const [quotesRes, fundResults, chartResults] = await Promise.all([
+    // 相場データ・財務データ・チャートOHLC・QQQベンチマークを並列取得
+    const [quotesRes, fundResults, chartResults, qqqChart] = await Promise.all([
       fetch(
         `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${tickers.join(',')}&crumb=${encodeURIComponent(crumb)}`,
         { headers: { 'User-Agent': UA, 'Cookie': cookie }, signal: AbortSignal.timeout(8000) }
       ),
       Promise.allSettled(tickers.map(t => fetchFundamentals(t, crumb, cookie))),
       Promise.allSettled(tickers.map(t => fetchChartOhlc(t))),
+      fetchChartOhlc('QQQ'),
     ]);
+    const qqqFactor = qqqChart && qqqChart.length >= 2
+      ? qqqChart.at(-1).close / qqqChart[0].close
+      : null;
 
     if (!quotesRes.ok) return Response.json({ error: 'fetch failed' }, { status: 502 });
     const data = await quotesRes.json();
@@ -109,6 +126,7 @@ export async function POST(request) {
       const volume     = q.regularMarketVolume || 0;
       const volAvg     = q.averageDailyVolume10Day || 0;
       const fund       = fundMap[q.symbol] || {};
+      const ohlc       = chartMap[q.symbol] ?? null;
       const row = {
         ticker:           q.symbol,
         price,
@@ -133,10 +151,15 @@ export async function POST(request) {
         psr:              q.priceToSalesTrailing12Months > 0
           ? Math.round(q.priceToSalesTrailing12Months * 10) / 10 : null,
         revenueGrowthYoy: fund.revenueGrowthYoy ?? null,
-        grossMargin:      fund.grossMargin ?? null,
+        grossMargin:      fund.grossMargin      ?? null,
+        revCAGR3Y:        fund.revCAGR3Y        ?? null,
       };
+      if (ohlc && ohlc.length >= 2 && qqqFactor != null && qqqFactor > 0) {
+        const stockFactor = ohlc.at(-1).close / ohlc[0].close;
+        row.rs = Math.round((stockFactor / qqqFactor) * 100) / 100;
+      }
+      row.islandReversal = isIslandReversal(ohlc);
       row.score          = calcScore(row);
-      row.islandReversal = isIslandReversal(chartMap[q.symbol] ?? null);
       if (row.islandReversal) row.score = Math.min(100, row.score + 5);
       row.trendMode      = getTrendMode(row);
       return row;

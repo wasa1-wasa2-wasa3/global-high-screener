@@ -125,7 +125,7 @@ async function batchFetchWithConcurrency(symbols, crumb, cookie) {
 // ─── Island Reversal 検知 ────────────────────────────────────────────────────
 
 async function fetchChartOhlc(ticker) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=7d`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y`;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 5000);
   try {
@@ -232,7 +232,7 @@ function mapQuote(q, meta) {
 
 async function fetchOneFundamentals(ticker, crumb, cookie) {
   const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}`
-    + `?modules=financialData&crumb=${encodeURIComponent(crumb)}`;
+    + `?modules=financialData,incomeStatementHistory&crumb=${encodeURIComponent(crumb)}`;
   const ctrl  = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 5000);
   try {
@@ -240,14 +240,27 @@ async function fetchOneFundamentals(ticker, crumb, cookie) {
     clearTimeout(timer);
     if (!res.ok) return { ticker };
     const data = await res.json();
-    const fd = data.quoteSummary?.result?.[0]?.financialData;
+    const result = data.quoteSummary?.result?.[0];
+    const fd = result?.financialData;
     if (!fd) return { ticker };
+
+    const hist = result?.incomeStatementHistory?.incomeStatementHistory;
+    let revCAGR3Y = null;
+    if (hist && hist.length >= 2) {
+      const revs = hist.map(y => y.totalRevenue?.raw).filter(r => r != null && r > 0);
+      if (revs.length >= 2) {
+        const n = revs.length - 1;
+        revCAGR3Y = Math.round((Math.pow(revs[0] / revs[n], 1 / n) - 1) * 1000) / 10;
+      }
+    }
+
     return {
       ticker,
       revenueGrowthYoy: fd.revenueGrowth?.raw != null
         ? Math.round(fd.revenueGrowth.raw * 1000) / 10 : null,
       grossMargin: fd.grossMargins?.raw != null
         ? Math.round(fd.grossMargins.raw * 1000) / 10 : null,
+      revCAGR3Y,
     };
   } catch {
     clearTimeout(timer);
@@ -317,13 +330,14 @@ export async function POST() {
       .sort((a, b) => b.score - a.score)
       .slice(0, 50); // Rev YoY フィルタ後も25件残るよう多めに取得
 
-    // Phase 3: 上位50件の fundamentals (revenueGrowthYoy / grossMargin) を並列取得
+    // Phase 3: 上位50件の fundamentals (revenueGrowthYoy / grossMargin / revCAGR3Y) を並列取得
     const fundMap = await enrichCandidates(candidates, crumb, cookie);
     const enriched = candidates.map(row => {
       const f = fundMap[row.ticker];
-      if (f?.revenueGrowthYoy != null || f?.grossMargin != null) {
+      if (f?.revenueGrowthYoy != null || f?.grossMargin != null || f?.revCAGR3Y != null) {
         row.revenueGrowthYoy = f.revenueGrowthYoy ?? null;
         row.grossMargin      = f.grossMargin      ?? null;
+        row.revCAGR3Y        = f.revCAGR3Y        ?? null;
         row.score = calcScore(row);
       }
       return row;
@@ -338,14 +352,26 @@ export async function POST() {
       .sort((a, b) => b.score - a.score)
       .slice(0, 25);
 
-    // Phase 4: Island Reversal 検知（最終25件を並列フェッチ）
-    await Promise.all(rows.map(async row => {
-      try {
-        const ohlc = await fetchChartOhlc(row.ticker);
-        row.islandReversal = isIslandReversal(ohlc);
-        if (row.islandReversal) row.score = Math.min(100, row.score + 5);
-      } catch { row.islandReversal = false; }
-    }));
+    // Phase 4: Island Reversal 検知 + RS計算（QQQ含め並列フェッチ）
+    const allCharts = await Promise.all([
+      fetchChartOhlc('QQQ'),
+      ...rows.map(row => fetchChartOhlc(row.ticker)),
+    ]);
+    const [qqqChart, ...stockCharts] = allCharts;
+    const qqqFactor = qqqChart && qqqChart.length >= 2
+      ? qqqChart.at(-1).close / qqqChart[0].close
+      : null;
+
+    rows.forEach((row, i) => {
+      const ohlc = stockCharts[i];
+      row.islandReversal = isIslandReversal(ohlc);
+      if (ohlc && ohlc.length >= 2 && qqqFactor != null && qqqFactor > 0) {
+        const stockFactor = ohlc.at(-1).close / ohlc[0].close;
+        row.rs = Math.round((stockFactor / qqqFactor) * 100) / 100;
+      }
+      row.score = calcScore(row);
+      if (row.islandReversal) row.score = Math.min(100, row.score + 5);
+    });
     rows.sort((a, b) => b.score - a.score);
 
     return Response.json({
