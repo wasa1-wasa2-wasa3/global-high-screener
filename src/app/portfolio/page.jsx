@@ -718,9 +718,6 @@ export default function PortfolioPage() {
                       <a href={yahooUrl(r.ticker)} target="_blank" rel="noopener noreferrer"
                         style={{ color: NAVY, fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>{r.ticker}</a>
                       <div style={{ fontSize: 11, color: '#64748B' }}>{r.name?.slice(0, 22) || '—'}</div>
-                      {r.is_otoko_kabu && (
-                        <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 4, background: 'linear-gradient(135deg,#FEF9C3,#FDE68A)', color: '#92400E', fontWeight: 800, border: '1px solid #F59E0B', display: 'inline-block', marginTop: 2 }}>💰 恩株</span>
-                      )}
                     </td>
                     <td style={{ padding: '8px 10px', fontWeight: 700 }}>
                       {price ? fmtUSD(price) : '—'}
@@ -774,19 +771,13 @@ export default function PortfolioPage() {
                         </div>
                       )}
                       {r.is_otoko_kabu ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                          <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 5, background: 'linear-gradient(135deg,#FEF9C3,#FDE68A)', color: '#92400E', fontWeight: 800, border: '1px solid #F59E0B', textAlign: 'center' }}>💰 恩株 Risk Free</span>
-                          <button onClick={() => toggleOtokoKabu(r.ticker)}
-                            style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, border: '1px solid #E2E8F0', background: '#F8FAFC', color: '#94A3B8', cursor: 'pointer' }}>恩株解除</button>
-                        </div>
+                        <button onClick={() => toggleOtokoKabu(r.ticker)}
+                          style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, border: '1px solid #E2E8F0', background: '#F8FAFC', color: '#94A3B8', cursor: 'pointer', display: 'block', width: '100%', marginBottom: 3 }}>恩株解除</button>
                       ) : showRecovery ? (
-                        <div>
-                          <div style={{ fontSize: 10, color: '#D97706', fontWeight: 600, marginBottom: 3 }}>💡 元本回収タイミング</div>
-                          <button onClick={() => toggleOtokoKabu(r.ticker)}
-                            style={{ fontSize: 11, padding: '3px 10px', borderRadius: 5, border: 'none', background: '#F59E0B', color: '#fff', cursor: 'pointer', fontWeight: 600, width: '100%' }}>
-                            ✨ 恩株化する
-                          </button>
-                        </div>
+                        <button onClick={() => toggleOtokoKabu(r.ticker)}
+                          style={{ fontSize: 11, padding: '3px 10px', borderRadius: 5, border: 'none', background: '#F59E0B', color: '#fff', cursor: 'pointer', fontWeight: 600, width: '100%', marginBottom: 3 }}>
+                          ✨ 恩株化する
+                        </button>
                       ) : holdingShares != null && avgCost != null ? (
                         <button onClick={() => toggleOtokoKabu(r.ticker)}
                           style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, border: '1px solid #E2E8F0', background: '#F8FAFC', color: '#CBD5E1', cursor: 'pointer' }}>
