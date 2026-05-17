@@ -49,11 +49,11 @@ function high52Color(pct) {
   return { color: '#64748B', bg: '#F8FAFC' };
 }
 const RANK_DEFS = [
-  { rank: 'S', range: '80–100', label: 'Strong Buy',   color: '#92400E', bg: '#FEF3C7', border: '#F59E0B', bar: '#F59E0B' },
-  { rank: 'A', range: '70–79',  label: 'Buy / Entry',  color: '#15803D', bg: '#DCFCE7', border: '#86EFAC', bar: '#16A34A' },
-  { rank: 'B', range: '60–69',  label: 'Watch / Hold', color: '#1D4ED8', bg: '#EFF6FF', border: '#93C5FD', bar: '#3B82F6' },
-  { rank: 'C', range: '50–59',  label: 'Neutral',      color: '#475569', bg: '#F1F5F9', border: '#CBD5E1', bar: '#94A3B8' },
-  { rank: 'D', range: '<50',    label: 'Ignore',       color: '#94A3B8', bg: '#F8FAFC', border: '#E2E8F0', bar: '#CBD5E1' },
+  { rank: 'S', range: '80–100', label: 'High Signal',  color: '#92400E', bg: '#FEF3C7', border: '#F59E0B', bar: '#F59E0B' },
+  { rank: 'A', range: '70–79',  label: 'Watch First',  color: '#15803D', bg: '#DCFCE7', border: '#86EFAC', bar: '#16A34A' },
+  { rank: 'B', range: '60–69',  label: 'On Radar',     color: '#1D4ED8', bg: '#EFF6FF', border: '#93C5FD', bar: '#3B82F6' },
+  { rank: 'C', range: '50–59',  label: 'Weak Signal',  color: '#475569', bg: '#F1F5F9', border: '#CBD5E1', bar: '#94A3B8' },
+  { rank: 'D', range: '<50',    label: 'Low Signal',   color: '#94A3B8', bg: '#F8FAFC', border: '#E2E8F0', bar: '#CBD5E1' },
 ];
 const SCORE_BREAKDOWN = [
   { label: '売上成長率 YoY',   max: 45, desc: '+50%以上 → +45pt ★最優先' },
@@ -876,6 +876,13 @@ export default function Page() {
         )}
       </div>
       <style>{`.spin-icon { animation: spin 1s linear infinite; } @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+
+      {/* Disclaimer */}
+      {tab === 'scan' && scanResults.length > 0 && (
+        <div style={{ marginBottom: 12, padding: '8px 14px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 11, color: '#94A3B8', lineHeight: 1.6 }}>
+          ⚠️ スコア・ランクは仮説モデルによる参考値です。バックテストは未実施であり、将来の利益を保証するものではありません。投資判断はご自身の責任で行ってください。
+        </div>
+      )}
 
       {/* STEP indicator */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
