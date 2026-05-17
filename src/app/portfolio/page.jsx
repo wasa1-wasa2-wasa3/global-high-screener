@@ -269,35 +269,30 @@ export default function PortfolioPage() {
     .filter(r => r.is_otoko_kabu && r.holdingShares != null && r.price != null)
     .reduce((s, r) => s + r.holdingShares * r.price, 0);
 
-  const guidanceMsg = (() => {
+  const todayActions = (() => {
     const scanned = itemList.filter(r => r.price != null);
-    if (!scanned.length) return null;
-    const harvest = scanned
+    if (!scanned.length) return [];
+    const actions = [];
+    const withPnl = scanned
       .filter(r => !r.is_otoko_kabu && r.avgCost != null)
+      .map(r => ({ ...r, pnlPct: (r.price / r.avgCost - 1) * 100 }));
+    withPnl.filter(r => r.pnlPct <= stopLoss).sort((a, b) => a.pnlPct - b.pnlPct)
+      .forEach(t => actions.push({ icon: '🚨', color: '#DC2626', border: '#FCA5A5', bg: 'linear-gradient(135deg,#FEF2F2,#FEE2E2)',
+        msg: `${t.ticker} が ${t.pnlPct.toFixed(1)}%。損切り実行を検討してください。` }));
+    withPnl.filter(r => r.pnlPct >= takeProfit && r.holdingShares != null).sort((a, b) => b.pnlPct - a.pnlPct)
+      .forEach(t => {
+        const sharesToSell = Math.ceil(t.holdingShares * t.avgCost / t.price);
+        actions.push({ icon: '💡', color: '#92400E', border: '#F59E0B', bg: 'linear-gradient(135deg,#FFFBEB,#FEF9C3)',
+          msg: `${t.ticker} が +${t.pnlPct.toFixed(0)}%。${sharesToSell}株売却で元本 ${fmtUSD(t.holdingShares * t.avgCost)} を回収できます。` });
+      });
+    const pipeline = scanned.filter(r => !r.is_otoko_kabu && r.avgCost != null)
       .map(r => ({ ...r, pnlPct: (r.price / r.avgCost - 1) * 100 }))
-      .filter(r => r.pnlPct >= takeProfit)
-      .sort((a, b) => b.pnlPct - a.pnlPct);
-    if (harvest.length) {
-      const t = harvest[0];
-      const sharesToSell = Math.ceil(t.holdingShares * t.avgCost / t.price);
-      return { icon: '🌾', color: '#92400E', border: '#F59E0B', bg: 'linear-gradient(135deg,#FFFBEB,#FEF9C3)',
-        msg: `${t.ticker} が +${t.pnlPct.toFixed(0)}% です。${sharesToSell}株を売却して元本 ${fmtUSD(t.holdingShares * t.avgCost)} を回収しましょう！` };
-    }
-    const stop = scanned
-      .filter(r => !r.is_otoko_kabu && r.avgCost != null)
-      .map(r => ({ ...r, pnlPct: (r.price / r.avgCost - 1) * 100 }))
-      .filter(r => r.pnlPct <= stopLoss)
-      .sort((a, b) => a.pnlPct - b.pnlPct);
-    if (stop.length) {
-      const t = stop[0];
-      return { icon: '🛡️', color: '#DC2626', border: '#FCA5A5', bg: 'linear-gradient(135deg,#FEF2F2,#FEE2E2)',
-        msg: `${t.ticker} が ${t.pnlPct.toFixed(1)}% に達しています。損切りラインです。今すぐ損失を最小化しましょう！` };
-    }
-    if (otokoKabuCount) {
-      return { icon: '💎', color: '#92400E', border: '#F59E0B', bg: 'linear-gradient(135deg,#FEF9C3,#FFFDE7)',
-        msg: `恩株 ${otokoKabuCount}銘柄（総額 ${fmtUSD(otokoKabuValueUSD)}）がリスクフリーで育っています。夢を見続けましょう！` };
-    }
-    return null;
+      .filter(r => (r.volRatio ?? 0) > 2.0 && (r.dayChangePct ?? 0) > 3.0);
+    pipeline.forEach(t => actions.push({ icon: '🔥', color: '#15803D', border: '#86EFAC', bg: 'linear-gradient(135deg,#ECFDF5,#D1FAE5)',
+      msg: `${t.ticker} が出来高 ${t.volRatio?.toFixed(1)}x・前日比 +${t.dayChangePct?.toFixed(1)}%。買い増しを検討してください。` }));
+    if (otokoKabuCount) actions.push({ icon: '💰', color: '#92400E', border: '#F59E0B', bg: 'linear-gradient(135deg,#FEF9C3,#FFFDE7)',
+      msg: `恩株 ${otokoKabuCount}銘柄（総額 ${fmtUSD(otokoKabuValueUSD)}）がリスクフリーで育っています。引き続きホールドしましょう。` });
+    return actions;
   })();
 
   return (
@@ -410,11 +405,15 @@ export default function PortfolioPage() {
         </div>
       )}
 
-      {/* Guidance banner */}
-      {guidanceMsg && (
-        <div style={{ marginBottom: 14, padding: '13px 18px', background: guidanceMsg.bg, border: `1.5px solid ${guidanceMsg.border}`, borderRadius: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 26, flexShrink: 0 }}>{guidanceMsg.icon}</span>
-          <div style={{ fontSize: 14, fontWeight: 700, color: guidanceMsg.color, lineHeight: 1.5 }}>{guidanceMsg.msg}</div>
+      {/* Today's action banners */}
+      {todayActions.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+          {todayActions.map((a, i) => (
+            <div key={i} style={{ padding: '13px 18px', background: a.bg, border: `1.5px solid ${a.border}`, borderRadius: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: 22, flexShrink: 0 }}>{a.icon}</span>
+              <div style={{ fontSize: 14, fontWeight: 700, color: a.color, lineHeight: 1.5 }}>{a.msg}</div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -522,6 +521,17 @@ export default function PortfolioPage() {
               else if (pnlPct >= takeProfit) { cardBg = '#F0FDF4'; cardBorder = '1px solid #86EFAC'; }
             }
 
+            const actionBadge = (() => {
+              if (r.is_otoko_kabu)      return { icon: '💰', label: '元本回収済・ガチホ', color: '#92400E', bg: '#FEF9C3',  border: '#F59E0B' };
+              if (pnlPct == null)        return null;
+              if (pnlPct <= stopLoss)    return { icon: '🚨', label: '損切り実行',         color: '#DC2626', bg: '#FEF2F2',  border: '#FCA5A5' };
+              if (pnlPct >= takeProfit)  return { icon: '💡', label: '半分売って元本回収', color: '#92400E', bg: '#FFFBEB',  border: '#F59E0B' };
+              if ((r.volRatio ?? 0) > 2.0 && (r.dayChangePct ?? 0) > 3.0)
+                                         return { icon: '🔥', label: '買い増し',           color: '#15803D', bg: '#DCFCE7',  border: '#86EFAC' };
+              if (pnlPct > 0)            return { icon: '🟢', label: 'ガチホ継続',         color: '#15803D', bg: '#F0FDF4',  border: '#86EFAC' };
+              return                            { icon: '🟡', label: '調整中・様子見',     color: '#D97706', bg: '#FFFBEB',  border: '#FDE68A' };
+            })();
+
             return (
               <div key={r.ticker} style={{ borderRadius: 14, border: cardBorder, overflow: 'hidden', background: cardBg }}>
                 <div style={{ background: NAVY, padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -529,8 +539,10 @@ export default function PortfolioPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3, flexWrap: 'wrap' }}>
                       <a href={yahooUrl(r.ticker)} target="_blank" rel="noopener noreferrer"
                         style={{ color: GOLD, fontWeight: 700, fontSize: 20, textDecoration: 'none' }}>{r.ticker}</a>
-                      {r.is_otoko_kabu && (
-                        <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 6, background: 'linear-gradient(135deg,#FEF9C3,#FDE68A)', color: '#92400E', fontWeight: 800, border: '1px solid #F59E0B' }}>💰 恩株 Risk Free</span>
+                      {actionBadge && (
+                        <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 6, background: actionBadge.bg, color: actionBadge.color, fontWeight: 700, border: `1px solid ${actionBadge.border}`, whiteSpace: 'nowrap' }}>
+                          {actionBadge.icon} {actionBadge.label}
+                        </span>
                       )}
                     </div>
                     <div style={{ fontSize: 12, color: '#94A3B8' }}>{r.name?.slice(0, 28) || '—'}</div>
@@ -683,6 +695,17 @@ export default function PortfolioPage() {
                   else if (pnlPct >= takeProfit) rowBg = '#F0FDF4';
                 }
 
+                const actionBadge = (() => {
+                  if (r.is_otoko_kabu)      return { icon: '💰', label: '元本回収済・ガチホ', color: '#92400E', bg: '#FEF9C3',  border: '#F59E0B' };
+                  if (pnlPct == null)        return null;
+                  if (pnlPct <= stopLoss)    return { icon: '🚨', label: '損切り実行',         color: '#DC2626', bg: '#FEF2F2',  border: '#FCA5A5' };
+                  if (pnlPct >= takeProfit)  return { icon: '💡', label: '半分売って元本回収', color: '#92400E', bg: '#FFFBEB',  border: '#F59E0B' };
+                  if ((r.volRatio ?? 0) > 2.0 && (r.dayChangePct ?? 0) > 3.0)
+                                             return { icon: '🔥', label: '買い増し',           color: '#15803D', bg: '#DCFCE7',  border: '#86EFAC' };
+                  if (pnlPct > 0)            return { icon: '🟢', label: 'ガチホ継続',         color: '#15803D', bg: '#F0FDF4',  border: '#86EFAC' };
+                  return                            { icon: '🟡', label: '調整中・様子見',     color: '#D97706', bg: '#FFFBEB',  border: '#FDE68A' };
+                })();
+
                 const isCopied = copiedTicker === r.ticker;
 
                 return (
@@ -744,7 +767,12 @@ export default function PortfolioPage() {
                         </span>
                       ) : '—'}
                     </td>
-                    <td style={{ padding: '8px 10px', minWidth: 130 }}>
+                    <td style={{ padding: '8px 10px', minWidth: 140 }}>
+                      {actionBadge && (
+                        <div style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 5, background: actionBadge.bg, color: actionBadge.color, border: `1px solid ${actionBadge.border}`, marginBottom: 5, textAlign: 'center', whiteSpace: 'nowrap' }}>
+                          {actionBadge.icon} {actionBadge.label}
+                        </div>
+                      )}
                       {r.is_otoko_kabu ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                           <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 5, background: 'linear-gradient(135deg,#FEF9C3,#FDE68A)', color: '#92400E', fontWeight: 800, border: '1px solid #F59E0B', textAlign: 'center' }}>💰 恩株 Risk Free</span>
@@ -778,6 +806,29 @@ export default function PortfolioPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* Action badge legend */}
+      {itemList.length > 0 && (
+        <details style={{ marginTop: 20 }}>
+          <summary style={{ fontSize: 12, color: '#94A3B8', cursor: 'pointer', userSelect: 'none' }}>アクションバッジの凡例</summary>
+          <div style={{ marginTop: 10, border: '1px solid #E2E8F0', borderRadius: 10, overflow: 'hidden', fontSize: 12 }}>
+            {[
+              { icon: '🔥', label: '買い増し',              desc: '出来高2x超 × 前日比+3%超 — ブレイクアウト発生中。ポジション拡大を検討。' },
+              { icon: '💡', label: '半分売って元本回収',    desc: `利確ライン(+${takeProfit}%)到達。取得総額分の株を売り、残りをリスクフリーで保有。` },
+              { icon: '💰', label: '元本回収済・ガチホ',    desc: '恩株化完了。コストゼロで無限に保有できる。売らずに夢を見る。' },
+              { icon: '🚨', label: '損切り実行',            desc: `損切りライン(${stopLoss}%)到達。今すぐ損失を確定し、資金を次の機会へ。` },
+              { icon: '🟡', label: '調整中・様子見',        desc: '損切りも利確もまだ。現在のトレンドが続くか監視。' },
+              { icon: '🟢', label: 'ガチホ継続',            desc: 'ポジションは安全圏。長期保有継続。焦らず待つ。' },
+            ].map((row, i) => (
+              <div key={row.icon} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 14px', background: i % 2 === 0 ? '#F8FAFC' : '#fff', borderTop: i > 0 ? '1px solid #F1F5F9' : 'none' }}>
+                <span style={{ fontSize: 16, flexShrink: 0 }}>{row.icon}</span>
+                <span style={{ fontWeight: 700, color: '#374151', minWidth: 130, flexShrink: 0 }}>{row.label}</span>
+                <span style={{ color: '#64748B', lineHeight: 1.5 }}>{row.desc}</span>
+              </div>
+            ))}
+          </div>
+        </details>
       )}
     </main>
   );

@@ -14,7 +14,9 @@ const WATCH_KEY     = 'us_watchlist_v1';
 const LAST_SCAN_KEY = 'us_scan_last_v1';
 const GUIDE_KEY     = 'guide_seen_us_v1';
 const FILTER_KEY    = 'us_filter_v2'; // v2: default 'all'、旧 'small' キャッシュをリセット
-const LIST_TYPE     = 'us_scan';
+const LIST_TYPE         = 'us_scan';
+const WATCH_REFRESH_KEY = 'us_watch_refreshed_v1';
+const WATCH_STALE_MS    = 60 * 60 * 1000;
 
 function fmtPrice(v) {
   if (v == null) return '—';
@@ -77,21 +79,37 @@ function hasBuySignal(score, signals) {
 
 // ─── Trend Lamp ──────────────────────────────────────────────────────────────
 const TREND_CFG = {
-  breakout: { arrow: '↑', color: '#16A34A', label: '買い増し', title: '↑ 絶好調 — 大出来高で52W高値突破・買い増し検討' },
-  holding:  { arrow: '→', color: '#64748B', label: '保有OK',  title: '→ 保有OK — 高値圏で出来高枯渇・健全な保ち合い' },
-  exit:     { arrow: '↓', color: '#DC2626', label: '売り検討', title: '↓ 要注意 — 大出来高でサポート割れ・売り検討' },
+  breakout: { arrow: '↑', color: '#16A34A', label: '買い増し',  title: '↑ 絶好調 — 大出来高で52W高値突破・買い増し検討' },
+  holding:  { arrow: '→', color: '#64748B', label: '保有OK',   title: '→ 保有OK — 高値圏で出来高枯渇・健全な保ち合い' },
+  exit:     { arrow: '↓', color: '#DC2626', label: '売り検討',  title: '↓ 要注意 — 大出来高でサポート割れ・売り検討' },
 };
-function TrendLamp({ mode, showLabel = false }) {
+const WATCH_CFG = {
+  breakout: { arrow: '↑', color: '#16A34A', label: '今すぐエントリー', title: '【Breakout!】大出来高で52W高値を突破しました。今がエントリーのベストタイミングです。買ったその日に逆指値を入れること。' },
+  holding:  { arrow: '→', color: '#64748B', label: 'もう少し待て',     title: '【待機中】高値圏をキープしていますが、エントリーサインはまだ出ていません。出来高が急増するまで待ちましょう。' },
+  exit:     { arrow: '↓', color: '#DC2626', label: 'ウォッチ外す候補',  title: '【トレンド悪化】大出来高でサポートを割り込みました。エントリーせずウォッチリストから外すことを検討してください。' },
+};
+const SCAN_CFG = {
+  breakout: { arrow: '↑', color: '#16A34A', label: '急いで★追加！',   title: '【Breakout検出】今この銘柄が動き始めています。★を押してウォッチリストに追加し、購入を検討してください。' },
+  holding:  { arrow: '→', color: '#64748B', label: '★追加して待つ',   title: '【高値圏キープ中】まだエントリーサインは出ていません。★でウォッチリストに追加して、Breakoutを待ちましょう。' },
+  exit:     { arrow: '↓', color: '#DC2626', label: '見送り推奨',       title: '【下降トレンド】大出来高でサポートを割り込んでいます。今は見送りを推奨します。' },
+};
+function TrendLamp({ mode, showLabel = false, watchMode = false, scanMode = false }) {
   if (!mode) {
+    const nullLabel = watchMode ? '待機中' : scanMode ? '★追加して待つ' : '様子見';
+    const nullTip   = watchMode
+      ? '【待機中】エントリーサイン（大出来高×高値突破）がまだ出ていません。ウォッチを続けて発火を待ちましょう。'
+      : scanMode
+        ? '【高値圏付近】まだ特定のトレンドシグナルはありません。★でウォッチリストに追加して様子を見ましょう。'
+        : '→ 様子見 — 特定のトレンドシグナルなし';
     return (
-      <span title="→ 様子見 — 特定のトレンドシグナルなし"
+      <span title={nullTip}
         style={{ display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0, color: '#CBD5E1' }}>
         <span style={{ fontSize: 13, fontWeight: 700, lineHeight: 1 }}>→</span>
-        {showLabel && <span style={{ fontSize: 10, fontWeight: 600 }}>様子見</span>}
+        {showLabel && <span style={{ fontSize: 10, fontWeight: 600 }}>{nullLabel}</span>}
       </span>
     );
   }
-  const cfg = TREND_CFG[mode];
+  const cfg = (watchMode ? WATCH_CFG : scanMode ? SCAN_CFG : TREND_CFG)[mode];
   if (!cfg) return null;
   return (
     <span title={cfg.title}
@@ -185,69 +203,109 @@ function SignalBadges({ score, signals, specialDividend }) {
 }
 
 // ─── Desktop row ───────────────────────────────────────────────────────────
-function ScanRow({ row, rank, watchlist, onWatch, usdJpy, onEnrich }) {
+function ScanRow({ row, rank, watchlist, onWatch, usdJpy, onEnrich,
+                   isWatchTab = false, buyingTicker, onBuyToggle, buyForm, onBuyFormChange, onBuySubmit }) {
   const signals   = getSignals(row);
   const isWatched = !!watchlist[row.ticker];
   const pct       = parseFloat(row.high52Pct);
   const hc        = high52Color(pct);
+  const buy       = hasBuySignal(row.score, signals);
+  const isBuying  = isWatchTab && buyingTicker === row.ticker;
 
-  const buy = hasBuySignal(row.score, signals);
   return (
-    <tr style={{ borderBottom: '1px solid #F1F5F9', background: buy ? (rank % 2 === 0 ? 'rgba(220,252,231,0.55)' : 'rgba(220,252,231,0.3)') : (rank % 2 === 0 ? '#F8FAFC' : '#fff') }}>
-      <td style={{ padding: '8px 6px', textAlign: 'center' }}>
-        <button onClick={() => onWatch(row)}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: isWatched ? GOLD : '#CBD5E1', padding: 0, minWidth: 32, minHeight: 32 }}>
-          {isWatched ? '★' : '☆'}
-        </button>
-      </td>
-      <td style={{ padding: '8px 10px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <TrendLamp mode={row.trendMode} showLabel />
-          <button onClick={() => onEnrich(row)}
-            style={{ color: NAVY, fontWeight: 700, fontSize: 14, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', textDecorationStyle: 'dotted' }}>
-            {row.ticker}
+    <>
+      <tr style={{ borderBottom: '1px solid #F1F5F9', background: buy ? (rank % 2 === 0 ? 'rgba(220,252,231,0.55)' : 'rgba(220,252,231,0.3)') : (rank % 2 === 0 ? '#F8FAFC' : '#fff') }}>
+        <td style={{ padding: '8px 6px', textAlign: 'center' }}>
+          <button onClick={() => onWatch(row)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: isWatched ? GOLD : '#CBD5E1', padding: 0, minWidth: 32, minHeight: 32 }}>
+            {isWatched ? '★' : '☆'}
           </button>
-          <a href={`https://finance.yahoo.co.jp/quote/${row.ticker}/chart`} target="_blank" rel="noopener noreferrer"
-            className="yf-chart-link"
-            title={`${row.ticker} チャートを開く`}
-            style={{ fontSize: 11, color: '#94A3B8', textDecoration: 'none', opacity: 0.7 }}>📈</a>
-        </div>
-        <div style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>{row.name?.slice(0, 22)}</div>
-        <div style={{ fontSize: 10, color: '#94A3B8' }}>{row.sector}</div>
-      </td>
-      <td style={{ padding: '8px 10px', fontWeight: 700, fontSize: 14 }}>{fmtPrice(row.price)}</td>
-      <td style={{ padding: '8px 10px', color: '#64748B', fontSize: 12 }}>
-        {usdJpy ? fmtJPY(row.price, usdJpy) : '—'}
-      </td>
-      <td style={{ padding: '8px 10px', fontWeight: 600, color: row.dayChangePct >= 0 ? '#059669' : '#DC2626' }}>
-        {row.dayChangePct >= 0 ? '+' : ''}{row.dayChangePct?.toFixed(2)}%
-      </td>
-      <td style={{ padding: '8px 10px' }}>
-        <span style={{ background: hc.bg, color: hc.color, padding: '2px 7px', borderRadius: 6, fontSize: 12, fontWeight: 700 }}>
-          {pct >= 0 ? '+' : ''}{pct.toFixed(1)}%
-        </span>
-      </td>
-      <td style={{ padding: '8px 10px', fontSize: 13, fontWeight: 600,
-        color: row.volRatio >= 2 ? '#DC2626' : row.volRatio >= 1.5 ? '#D97706' : '#374151' }}>
-        {row.volRatio ? row.volRatio.toFixed(1) + 'x' : '—'}
-      </td>
-      <td style={{ padding: '8px 10px', fontSize: 12, color: '#64748B' }}>{fmtMktCap(row.marketCap)}</td>
-      <td style={{ padding: '8px 10px', fontSize: 12,
-        fontWeight: row.revenueGrowthYoy != null && row.revenueGrowthYoy >= 30 ? 700 : 400,
-        color: row.revenueGrowthYoy != null ? (row.revenueGrowthYoy >= 50 ? '#15803D' : row.revenueGrowthYoy >= 20 ? '#D97706' : '#64748B') : '#CBD5E1' }}>
-        {row.revenueGrowthYoy != null ? (row.revenueGrowthYoy >= 0 ? '+' : '') + row.revenueGrowthYoy.toFixed(1) + '%' : '—'}
-      </td>
-      <td style={{ padding: '8px 10px', fontSize: 12,
-        color: row.grossMargin != null ? (row.grossMargin >= 70 ? '#15803D' : row.grossMargin >= 50 ? '#D97706' : '#64748B') : '#CBD5E1' }}>
-        {row.grossMargin != null ? row.grossMargin.toFixed(1) + '%' : '—'}
-      </td>
-      <td style={{ padding: '8px 10px' }}>
-        <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} />
-      </td>
-      <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-        <ScoreBadge score={row.score} />
-      </td>
-    </tr>
+        </td>
+        <td style={{ padding: '8px 10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+            <TrendLamp mode={row.trendMode} showLabel watchMode={isWatchTab} scanMode={!isWatchTab} />
+            <button onClick={() => onEnrich(row)}
+              style={{ color: NAVY, fontWeight: 700, fontSize: 14, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', textDecorationStyle: 'dotted' }}>
+              {row.ticker}
+            </button>
+            <a href={`https://finance.yahoo.co.jp/quote/${row.ticker}/chart`} target="_blank" rel="noopener noreferrer"
+              className="yf-chart-link"
+              title={`${row.ticker} チャートを開く`}
+              style={{ fontSize: 11, color: '#94A3B8', textDecoration: 'none', opacity: 0.7 }}>📈</a>
+            {isWatchTab && row.trendMode === 'breakout' && (
+              <button onClick={() => onBuyToggle(row.ticker)}
+                style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: isBuying ? '#DCFCE7' : '#F0FDF4', color: '#15803D', border: '1px solid #86EFAC', cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                ✅ 購入した
+              </button>
+            )}
+          </div>
+          <div style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>{row.name?.slice(0, 22)}</div>
+          <div style={{ fontSize: 10, color: '#94A3B8' }}>{row.sector}</div>
+        </td>
+        <td style={{ padding: '8px 10px', fontWeight: 700, fontSize: 14 }}>{fmtPrice(row.price)}</td>
+        <td style={{ padding: '8px 10px', color: '#64748B', fontSize: 12 }}>
+          {usdJpy ? fmtJPY(row.price, usdJpy) : '—'}
+        </td>
+        <td style={{ padding: '8px 10px', fontWeight: 600, color: row.dayChangePct >= 0 ? '#059669' : '#DC2626' }}>
+          {row.dayChangePct >= 0 ? '+' : ''}{row.dayChangePct?.toFixed(2)}%
+        </td>
+        <td style={{ padding: '8px 10px' }}>
+          <span style={{ background: hc.bg, color: hc.color, padding: '2px 7px', borderRadius: 6, fontSize: 12, fontWeight: 700 }}>
+            {pct >= 0 ? '+' : ''}{pct.toFixed(1)}%
+          </span>
+        </td>
+        <td style={{ padding: '8px 10px', fontSize: 13, fontWeight: 600,
+          color: row.volRatio >= 2 ? '#DC2626' : row.volRatio >= 1.5 ? '#D97706' : '#374151' }}>
+          {row.volRatio ? row.volRatio.toFixed(1) + 'x' : '—'}
+        </td>
+        <td style={{ padding: '8px 10px', fontSize: 12, color: '#64748B' }}>{fmtMktCap(row.marketCap)}</td>
+        <td style={{ padding: '8px 10px', fontSize: 12,
+          fontWeight: row.revenueGrowthYoy != null && row.revenueGrowthYoy >= 30 ? 700 : 400,
+          color: row.revenueGrowthYoy != null ? (row.revenueGrowthYoy >= 50 ? '#15803D' : row.revenueGrowthYoy >= 20 ? '#D97706' : '#64748B') : '#CBD5E1' }}>
+          {row.revenueGrowthYoy != null ? (row.revenueGrowthYoy >= 0 ? '+' : '') + row.revenueGrowthYoy.toFixed(1) + '%' : '—'}
+        </td>
+        <td style={{ padding: '8px 10px', fontSize: 12,
+          color: row.grossMargin != null ? (row.grossMargin >= 70 ? '#15803D' : row.grossMargin >= 50 ? '#D97706' : '#64748B') : '#CBD5E1' }}>
+          {row.grossMargin != null ? row.grossMargin.toFixed(1) + '%' : '—'}
+        </td>
+        <td style={{ padding: '8px 10px' }}>
+          <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} />
+        </td>
+        <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+          <ScoreBadge score={row.score} />
+        </td>
+      </tr>
+      {isBuying && (
+        <tr style={{ background: '#F0FDF4' }}>
+          <td colSpan={12} style={{ padding: '10px 16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#15803D' }}>📥 {row.ticker} をポートフォリオに追加</span>
+              <label style={{ fontSize: 12, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
+                平均取得単価 (USD):
+                <input type="number" value={buyForm.avgCost} onChange={e => onBuyFormChange('avgCost', e.target.value)}
+                  placeholder={row.price?.toFixed(2)}
+                  style={{ width: 90, padding: '4px 8px', borderRadius: 6, border: '1px solid #86EFAC', fontSize: 13 }} />
+              </label>
+              <label style={{ fontSize: 12, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
+                株数:
+                <input type="number" value={buyForm.shares} onChange={e => onBuyFormChange('shares', e.target.value)}
+                  placeholder="10"
+                  style={{ width: 70, padding: '4px 8px', borderRadius: 6, border: '1px solid #86EFAC', fontSize: 13 }} />
+              </label>
+              <button onClick={() => onBuySubmit(row)}
+                disabled={!buyForm.avgCost || !buyForm.shares}
+                style={{ padding: '5px 16px', borderRadius: 7, background: buyForm.avgCost && buyForm.shares ? '#15803D' : '#94A3B8', color: '#fff', border: 'none', fontWeight: 700, fontSize: 13, cursor: buyForm.avgCost && buyForm.shares ? 'pointer' : 'not-allowed' }}>
+                📊 ポートフォリオへ
+              </button>
+              <button onClick={() => onBuyToggle(null)}
+                style={{ padding: '5px 12px', borderRadius: 7, background: '#fff', color: '#64748B', border: '1px solid #E2E8F0', fontSize: 12, cursor: 'pointer' }}>
+                キャンセル
+              </button>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
@@ -261,13 +319,16 @@ function MetricCell({ label, value, color = '#374151', bg = '#F8FAFC' }) {
   );
 }
 
-function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich }) {
+function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich,
+                    isWatchTab = false, buyingTicker, onBuyToggle, buyForm, onBuyFormChange, onBuySubmit }) {
   const signals   = getSignals(row);
   const isWatched = !!watchlist[row.ticker];
   const pct       = parseFloat(row.high52Pct);
   const hc        = high52Color(pct);
+  const isBuying  = isWatchTab && buyingTicker === row.ticker;
 
   return (
+    <>
     <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E2E8F0', overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.06)' }}>
       <div style={{ background: NAVY, padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
@@ -276,7 +337,7 @@ function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich }) {
               style={{ color: GOLD, fontWeight: 700, fontSize: 19, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', textDecorationStyle: 'dotted', textDecorationColor: GOLD }}>
               {row.ticker}
             </button>
-            <TrendLamp mode={row.trendMode} showLabel />
+            <TrendLamp mode={row.trendMode} showLabel watchMode={isWatchTab} scanMode={!isWatchTab} />
             <a href={`https://finance.yahoo.co.jp/quote/${row.ticker}/chart`} target="_blank" rel="noopener noreferrer"
               className="yf-chart-link"
               title={`${row.ticker} チャートを開く`}
@@ -326,8 +387,45 @@ function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich }) {
             bg={row.grossMargin != null && row.grossMargin >= 70 ? '#ECFDF5' : '#F8FAFC'} />
         </div>
         <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} />
+        {isWatchTab && row.trendMode === 'breakout' && (
+          <button onClick={() => onBuyToggle(row.ticker)}
+            style={{ marginTop: 10, width: '100%', padding: '9px', borderRadius: 8, background: isBuying ? '#DCFCE7' : '#F0FDF4', color: '#15803D', border: '1px solid #86EFAC', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+            ✅ 購入した → ポートフォリオへ
+          </button>
+        )}
       </div>
     </div>
+    {isBuying && (
+      <div style={{ background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: 12, padding: '14px 16px', marginTop: -8 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#15803D', marginBottom: 10 }}>📥 {row.ticker} をポートフォリオに追加</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <label style={{ fontSize: 12, color: '#374151', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ minWidth: 120 }}>平均取得単価 (USD):</span>
+            <input type="number" value={buyForm.avgCost} onChange={e => onBuyFormChange('avgCost', e.target.value)}
+              placeholder={row.price?.toFixed(2)}
+              style={{ flex: 1, padding: '6px 10px', borderRadius: 6, border: '1px solid #86EFAC', fontSize: 13 }} />
+          </label>
+          <label style={{ fontSize: 12, color: '#374151', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ minWidth: 120 }}>株数:</span>
+            <input type="number" value={buyForm.shares} onChange={e => onBuyFormChange('shares', e.target.value)}
+              placeholder="10"
+              style={{ flex: 1, padding: '6px 10px', borderRadius: 6, border: '1px solid #86EFAC', fontSize: 13 }} />
+          </label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => onBuySubmit(row)}
+              disabled={!buyForm.avgCost || !buyForm.shares}
+              style={{ flex: 1, padding: '8px', borderRadius: 7, background: buyForm.avgCost && buyForm.shares ? '#15803D' : '#94A3B8', color: '#fff', border: 'none', fontWeight: 700, fontSize: 13, cursor: buyForm.avgCost && buyForm.shares ? 'pointer' : 'not-allowed' }}>
+              📊 ポートフォリオへ
+            </button>
+            <button onClick={() => onBuyToggle(null)}
+              style={{ padding: '8px 16px', borderRadius: 7, background: '#fff', color: '#64748B', border: '1px solid #E2E8F0', fontSize: 13, cursor: 'pointer' }}>
+              キャンセル
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
@@ -348,8 +446,10 @@ export default function Page() {
   const [enrichData, setEnrichData]   = useState(null);
   const [fundData, setFundData]       = useState(null);
   const [enrichLoading, setEnrichLoading] = useState(false);
-  const [watchRefreshing, setWatchRefreshing] = useState(false);
+  const [watchRefreshing, setWatchRefreshing]   = useState(false);
   const [watchRefreshedAt, setWatchRefreshedAt] = useState(null);
+  const [buyingTicker, setBuyingTicker]         = useState(null);
+  const [buyForm, setBuyForm]                   = useState({ avgCost: '', shares: '' });
 
   useEffect(() => {
     if (!localStorage.getItem(GUIDE_KEY)) window.location.replace('/guide');
@@ -368,6 +468,8 @@ export default function Page() {
       if (saved) { const d = JSON.parse(saved); setScanResults(d.rows || []); setScannedAt(d.scannedAt); if (d.scannedCount) setScannedCount(d.scannedCount); }
       const wl = localStorage.getItem(WATCH_KEY);
       if (wl) setWatchlist(JSON.parse(wl));
+      const wr = localStorage.getItem(WATCH_REFRESH_KEY);
+      if (wr) setWatchRefreshedAt(wr);
     } catch {}
   }, []);
 
@@ -378,6 +480,14 @@ export default function Page() {
   useEffect(() => {
     try { localStorage.setItem(FILTER_KEY, JSON.stringify({ cap: capFilter, sector: sectorFilter })); } catch {}
   }, [capFilter, sectorFilter]);
+
+  useEffect(() => {
+    if (tab !== 'watchlist') return;
+    if (Object.keys(watchlist).length === 0) return;
+    const lastRefreshed = localStorage.getItem(WATCH_REFRESH_KEY);
+    const isStale = !lastRefreshed || Date.now() - new Date(lastRefreshed) > WATCH_STALE_MS;
+    if (isStale) refreshWatchlist();
+  }, [tab]);
 
   async function runScan() {
     setLoading(true);
@@ -423,6 +533,26 @@ export default function Page() {
     localStorage.setItem(WATCH_KEY, JSON.stringify(next));
   }
 
+  function handleBuyToggle(ticker) {
+    if (buyingTicker === ticker || ticker === null) {
+      setBuyingTicker(null);
+      setBuyForm({ avgCost: '', shares: '' });
+    } else {
+      setBuyingTicker(ticker);
+      setBuyForm({ avgCost: '', shares: '' });
+    }
+  }
+
+  function addToPortfolio(row, avgCost, shares) {
+    try {
+      const stored = localStorage.getItem('us_portfolio_v1');
+      const portfolio = stored ? JSON.parse(stored) : {};
+      portfolio[row.ticker] = { ...row, avgCost: parseFloat(avgCost), holdingShares: parseFloat(shares), savedAt: Date.now() };
+      localStorage.setItem('us_portfolio_v1', JSON.stringify(portfolio));
+      window.location.href = '/portfolio';
+    } catch {}
+  }
+
   async function refreshWatchlist() {
     const tickers = Object.keys(watchlist);
     if (tickers.length === 0) return;
@@ -444,7 +574,9 @@ export default function Page() {
         );
         setWatchlist(next);
         localStorage.setItem(WATCH_KEY, JSON.stringify(next));
-        setWatchRefreshedAt(new Date().toISOString());
+        const now = new Date().toISOString();
+        setWatchRefreshedAt(now);
+        localStorage.setItem(WATCH_REFRESH_KEY, now);
       }
     } catch {}
     setWatchRefreshing(false);
@@ -745,6 +877,35 @@ export default function Page() {
       </div>
       <style>{`.spin-icon { animation: spin 1s linear infinite; } @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
 
+      {/* STEP indicator */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 5, background: tab === 'scan' ? GOLD : '#F1F5F9', color: tab === 'scan' ? NAVY : '#94A3B8' }}>STEP ①</span>
+          <span style={{ fontSize: 11, color: tab === 'scan' ? NAVY : '#94A3B8', fontWeight: tab === 'scan' ? 700 : 400 }}>スキャン</span>
+          {tab === 'scan' && <span style={{ fontSize: 9, color: GOLD, fontWeight: 700 }}>◀ 現在地</span>}
+        </div>
+        <span style={{ color: '#CBD5E1', fontSize: 11 }}>→</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 5, background: tab === 'watchlist' ? GOLD : '#F1F5F9', color: tab === 'watchlist' ? NAVY : '#94A3B8' }}>STEP ②</span>
+          <span style={{ fontSize: 11, color: tab === 'watchlist' ? NAVY : '#94A3B8', fontWeight: tab === 'watchlist' ? 700 : 400 }}>ウォッチ</span>
+          {tab === 'watchlist' && <span style={{ fontSize: 9, color: GOLD, fontWeight: 700 }}>◀ 現在地</span>}
+        </div>
+        <span style={{ color: '#CBD5E1', fontSize: 11 }}>→</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <a href="/portfolio" style={{ textDecoration: 'none' }}>
+            <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 5, background: '#F1F5F9', color: '#94A3B8' }}>STEP ③</span>
+          </a>
+          <span style={{ fontSize: 11, color: '#94A3B8' }}>ポートフォリオ</span>
+        </div>
+      </div>
+
+      {/* Stale warning */}
+      {tab === 'watchlist' && watchRows.length > 0 && watchRefreshedAt && Date.now() - new Date(watchRefreshedAt) > WATCH_STALE_MS && (
+        <div style={{ marginBottom: 12, padding: '10px 14px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, fontSize: 12, color: '#92400E', display: 'flex', alignItems: 'center', gap: 8 }}>
+          ⚠️ データが1時間以上古くなっています。「価格を更新」ボタンを押してください。
+        </div>
+      )}
+
       {/* Results */}
       {displayRows.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94A3B8' }}>
@@ -771,7 +932,10 @@ export default function Page() {
       ) : isMobile ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {displayRows.map(r => (
-            <ScanCard key={r.ticker} row={r} watchlist={watchlist} onWatch={toggleWatch} usdJpy={usdJpy} onEnrich={openEnrich} />
+            <ScanCard key={r.ticker} row={r} watchlist={watchlist} onWatch={toggleWatch} usdJpy={usdJpy} onEnrich={openEnrich}
+              isWatchTab={tab === 'watchlist'} buyingTicker={buyingTicker} onBuyToggle={handleBuyToggle}
+              buyForm={buyForm} onBuyFormChange={(f, v) => setBuyForm(p => ({ ...p, [f]: v }))}
+              onBuySubmit={r => addToPortfolio(r, buyForm.avgCost, buyForm.shares)} />
           ))}
         </div>
       ) : (
@@ -789,7 +953,10 @@ export default function Page() {
             </thead>
             <tbody>
               {displayRows.map((r, i) => (
-                <ScanRow key={r.ticker} row={r} rank={i + 1} watchlist={watchlist} onWatch={toggleWatch} usdJpy={usdJpy} onEnrich={openEnrich} />
+                <ScanRow key={r.ticker} row={r} rank={i + 1} watchlist={watchlist} onWatch={toggleWatch} usdJpy={usdJpy} onEnrich={openEnrich}
+                  isWatchTab={tab === 'watchlist'} buyingTicker={buyingTicker} onBuyToggle={handleBuyToggle}
+                  buyForm={buyForm} onBuyFormChange={(f, v) => setBuyForm(p => ({ ...p, [f]: v }))}
+                  onBuySubmit={r => addToPortfolio(r, buyForm.avgCost, buyForm.shares)} />
               ))}
             </tbody>
           </table>
