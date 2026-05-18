@@ -525,7 +525,7 @@ export default function PortfolioPage() {
               if (r.is_otoko_kabu)      return { icon: '💰', label: '元本回収済・ガチホ', color: '#92400E', bg: '#FEF9C3',  border: '#F59E0B' };
               if (pnlPct == null)        return null;
               if (pnlPct <= stopLoss)    return { icon: '🚨', label: '損切り実行',         color: '#DC2626', bg: '#FEF2F2',  border: '#FCA5A5' };
-              if (pnlPct >= takeProfit)  return { icon: '💡', label: '半分売って元本回収', color: '#92400E', bg: '#FFFBEB',  border: '#F59E0B' };
+              if (pnlPct >= takeProfit)  return { icon: '💡', label: '元本を回収する', color: '#92400E', bg: '#FFFBEB',  border: '#F59E0B' };
               if ((r.volRatio ?? 0) > 2.0 && (r.dayChangePct ?? 0) > 3.0)
                                          return { icon: '🔥', label: '買い増し',           color: '#15803D', bg: '#DCFCE7',  border: '#86EFAC' };
               if (pnlPct > 0)            return { icon: '🟢', label: 'ガチホ継続',         color: '#15803D', bg: '#F0FDF4',  border: '#86EFAC' };
@@ -699,7 +699,7 @@ export default function PortfolioPage() {
                   if (r.is_otoko_kabu)      return { icon: '💰', label: '元本回収済・ガチホ', color: '#92400E', bg: '#FEF9C3',  border: '#F59E0B' };
                   if (pnlPct == null)        return null;
                   if (pnlPct <= stopLoss)    return { icon: '🚨', label: '損切り実行',         color: '#DC2626', bg: '#FEF2F2',  border: '#FCA5A5' };
-                  if (pnlPct >= takeProfit)  return { icon: '💡', label: '半分売って元本回収', color: '#92400E', bg: '#FFFBEB',  border: '#F59E0B' };
+                  if (pnlPct >= takeProfit)  return { icon: '💡', label: '元本を回収する', color: '#92400E', bg: '#FFFBEB',  border: '#F59E0B' };
                   if ((r.volRatio ?? 0) > 2.0 && (r.dayChangePct ?? 0) > 3.0)
                                              return { icon: '🔥', label: '買い増し',           color: '#15803D', bg: '#DCFCE7',  border: '#86EFAC' };
                   if (pnlPct > 0)            return { icon: '🟢', label: 'ガチホ継続',         color: '#15803D', bg: '#F0FDF4',  border: '#86EFAC' };
@@ -806,7 +806,7 @@ export default function PortfolioPage() {
           <div style={{ marginTop: 10, border: '1px solid #E2E8F0', borderRadius: 10, overflow: 'hidden', fontSize: 12 }}>
             {[
               { icon: '🔥', label: '買い増し',              desc: '出来高2x超 × 前日比+3%超 — ブレイクアウト発生中。ポジション拡大を検討。' },
-              { icon: '💡', label: '半分売って元本回収',    desc: `利確ライン(+${takeProfit}%)到達。取得総額分の株を売り、残りをリスクフリーで保有。` },
+              { icon: '💡', label: '元本を回収する',    desc: `利確ライン(+${takeProfit}%)到達。取得総額分の株を売り、残りをリスクフリーで保有。` },
               { icon: '💰', label: '元本回収済・ガチホ',    desc: '恩株化完了。コストゼロで無限に保有できる。売らずに夢を見る。' },
               { icon: '🚨', label: '損切り実行',            desc: `損切りライン(${stopLoss}%)到達。今すぐ損失を確定し、資金を次の機会へ。` },
               { icon: '🟡', label: '調整中・様子見',        desc: '損切りも利確もまだ。現在のトレンドが続くか監視。' },
