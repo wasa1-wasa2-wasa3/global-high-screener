@@ -983,6 +983,32 @@ export default function Page() {
           </table>
         </div>
       )}
+
+      {/* Signal legend */}
+      {displayRows.length > 0 && (
+        <details style={{ marginTop: 20 }}>
+          <summary style={{ fontSize: 12, color: '#94A3B8', cursor: 'pointer', userSelect: 'none' }}>シグナル・凡例</summary>
+          <div style={{ marginTop: 10, border: '1px solid #E2E8F0', borderRadius: 10, overflow: 'hidden', fontSize: 12 }}>
+            {[
+              { badge: '🟢 BUY',          bg: '#DCFCE7', color: '#15803D', border: '#86EFAC', desc: 'スコア70以上 かつ 過熱なし — 買いシグナルが総合的に揃っている' },
+              { badge: '📈 RS 1.5x+',     bg: '#EFF6FF', color: '#1D4ED8', border: '#93C5FD', desc: '相対強度 vs QQQ — 過去1年でQQQの1.5倍以上のリターンを記録している銘柄' },
+              { badge: '🔴 Breakout',     bg: '#F1F5F9', color: '#DC2626', border: 'transparent', desc: '52W高値圏 × 出来高1.5x超 × 前日比+0.5%超 — ブレイクアウト発生中' },
+              { badge: '🔵 押し目',       bg: '#F1F5F9', color: '#2563EB', border: 'transparent', desc: '7日以内に52W高値圏にいたが現在-2〜-10%押し — 二番底エントリーゾーン' },
+              { badge: '⏳ 決算近',       bg: '#F1F5F9', color: '#D97706', border: 'transparent', desc: '7日以内に決算発表予定 — 結果次第で急騰/急落するリスクあり' },
+              { badge: '🟡 STAY',         bg: '#FEF9C3', color: '#A16207', border: '#FDE047',    desc: '50日線から30%超乖離 — 過熱状態。新規エントリーは見送り推奨' },
+              { badge: '💎 DEEP VALUE',   bg: '#F1F5F9', color: '#7C3AED', border: 'transparent', desc: 'PBR 1.0倍未満 — 純資産以下の価格で取引されている割安株' },
+              { badge: '🏝️ アイランド底', bg: '#F1F5F9', color: '#0891B2', border: 'transparent', desc: 'ギャップダウン→孤立→ギャップアップ — チャート上の底打ち反転シグナル' },
+            ].map((row, i) => (
+              <div key={row.badge} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 14px', background: i % 2 === 0 ? '#F8FAFC' : '#fff', borderTop: i > 0 ? '1px solid #F1F5F9' : 'none' }}>
+                <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 5, background: row.bg, color: row.color, border: `1px solid ${row.border}`, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  {row.badge}
+                </span>
+                <span style={{ color: '#64748B', lineHeight: 1.5 }}>{row.desc}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
     </main>
   );
 }
