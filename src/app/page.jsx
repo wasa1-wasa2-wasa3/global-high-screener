@@ -181,7 +181,7 @@ function SignalBadges({ score, signals, specialDividend, rs }) {
     <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center' }}>
       {buy && (
         <span className="buy-pulse" style={{ fontSize: 11, padding: '3px 8px', borderRadius: 5, background: '#DCFCE7', color: '#15803D', fontWeight: 700, border: '1px solid #86EFAC', whiteSpace: 'nowrap' }}>
-          🟢 BUY
+          🟢 買い
         </span>
       )}
       {rs != null && rs >= 1.5 && (
@@ -197,7 +197,7 @@ function SignalBadges({ score, signals, specialDividend, rs }) {
             ? { background: '#FEF9C3', color: '#A16207', border: '1px solid #FDE047' }
             : { background: '#F1F5F9', color: s.color }),
         }}>
-          {s.type === 'overheated' ? '🟡 STAY' : `${s.icon} ${s.label}`}
+          {s.type === 'overheated' ? '🟡 過熱' : `${s.icon} ${s.label}`}
         </span>
       ))}
       {specialDividend && (
@@ -987,23 +987,43 @@ export default function Page() {
       {/* Signal legend */}
       {displayRows.length > 0 && (
         <details style={{ marginTop: 20 }}>
-          <summary style={{ fontSize: 12, color: '#94A3B8', cursor: 'pointer', userSelect: 'none' }}>シグナル・凡例</summary>
-          <div style={{ marginTop: 10, border: '1px solid #E2E8F0', borderRadius: 10, overflow: 'hidden', fontSize: 12 }}>
+          <summary style={{ fontSize: 12, color: '#94A3B8', cursor: 'pointer', userSelect: 'none' }}>シグナル凡例</summary>
+          <div style={{ marginTop: 10, fontSize: 12 }}>
             {[
-              { badge: '🟢 BUY',          bg: '#DCFCE7', color: '#15803D', border: '#86EFAC', desc: 'スコア70以上 かつ 過熱なし — 買いシグナルが総合的に揃っている' },
-              { badge: '📈 RS 1.5x+',     bg: '#EFF6FF', color: '#1D4ED8', border: '#93C5FD', desc: '相対強度 vs QQQ — 過去1年でQQQの1.5倍以上のリターンを記録している銘柄' },
-              { badge: '🔴 Breakout',     bg: '#F1F5F9', color: '#DC2626', border: 'transparent', desc: '52W高値圏 × 出来高1.5x超 × 前日比+0.5%超 — ブレイクアウト発生中' },
-              { badge: '🔵 押し目',       bg: '#F1F5F9', color: '#2563EB', border: 'transparent', desc: '7日以内に52W高値圏にいたが現在-2〜-10%押し — 二番底エントリーゾーン' },
-              { badge: '⏳ 決算近',       bg: '#F1F5F9', color: '#D97706', border: 'transparent', desc: '7日以内に決算発表予定 — 結果次第で急騰/急落するリスクあり' },
-              { badge: '🟡 STAY',         bg: '#FEF9C3', color: '#A16207', border: '#FDE047',    desc: '50日線から30%超乖離 — 過熱状態。新規エントリーは見送り推奨' },
-              { badge: '💎 DEEP VALUE',   bg: '#F1F5F9', color: '#7C3AED', border: 'transparent', desc: 'PBR 1.0倍未満 — 純資産以下の価格で取引されている割安株' },
-              { badge: '🏝️ アイランド底', bg: '#F1F5F9', color: '#0891B2', border: 'transparent', desc: 'ギャップダウン→孤立→ギャップアップ — チャート上の底打ち反転シグナル' },
-            ].map((row, i) => (
-              <div key={row.badge} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 14px', background: i % 2 === 0 ? '#F8FAFC' : '#fff', borderTop: i > 0 ? '1px solid #F1F5F9' : 'none' }}>
-                <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 5, background: row.bg, color: row.color, border: `1px solid ${row.border}`, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  {row.badge}
-                </span>
-                <span style={{ color: '#64748B', lineHeight: 1.5 }}>{row.desc}</span>
+              {
+                group: '📈 買いシグナル',
+                items: [
+                  { badge: '🟢 買い',    bg: '#DCFCE7', color: '#15803D', border: '#86EFAC',    desc: 'スコア70以上・過熱なし' },
+                  { badge: '🔴 突破',    bg: '#F1F5F9', color: '#DC2626', border: '#FECACA',    desc: '高値圏×出来高1.5倍超×上昇' },
+                  { badge: '🔵 押し目',  bg: '#EFF6FF', color: '#2563EB', border: '#BFDBFE',    desc: '高値圏から2〜10%の押し戻し' },
+                  { badge: '📈 RS',      bg: '#EFF6FF', color: '#1D4ED8', border: '#93C5FD',    desc: 'QQQ比1.5倍超のリターン' },
+                ],
+              },
+              {
+                group: '⚠️ 注意シグナル',
+                items: [
+                  { badge: '🟡 過熱',    bg: '#FEF9C3', color: '#A16207', border: '#FDE047',    desc: '50日線から30%超乖離・新規見送り' },
+                  { badge: '⏳ 決算近',  bg: '#FEF3C7', color: '#D97706', border: '#FDE68A',    desc: '7日以内に決算発表・急騰急落リスク' },
+                ],
+              },
+              {
+                group: 'ℹ️ その他',
+                items: [
+                  { badge: '💎 割安',       bg: '#F5F3FF', color: '#7C3AED', border: '#DDD6FE', desc: 'PBR 1.0倍未満・純資産以下で割安' },
+                  { badge: '🏝️ アイランド底', bg: '#ECFEFF', color: '#0891B2', border: '#A5F3FC', desc: 'ギャップダウン→孤立→ギャップアップ反転' },
+                ],
+              },
+            ].map(g => (
+              <div key={g.group} style={{ marginBottom: 10, border: '1px solid #E2E8F0', borderRadius: 10, overflow: 'hidden' }}>
+                <div style={{ padding: '6px 14px', background: '#F8FAFC', fontSize: 11, fontWeight: 700, color: '#64748B', borderBottom: '1px solid #E2E8F0' }}>{g.group}</div>
+                {g.items.map((row, i) => (
+                  <div key={row.badge} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', background: i % 2 === 0 ? '#fff' : '#FAFAFA', borderTop: i > 0 ? '1px solid #F1F5F9' : 'none' }}>
+                    <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 5, background: row.bg, color: row.color, border: `1px solid ${row.border}`, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0, minWidth: 70, textAlign: 'center' }}>
+                      {row.badge}
+                    </span>
+                    <span style={{ color: '#64748B' }}>{row.desc}</span>
+                  </div>
+                ))}
               </div>
             ))}
           </div>

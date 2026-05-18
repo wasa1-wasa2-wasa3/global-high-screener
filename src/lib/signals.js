@@ -4,7 +4,7 @@ export function getSignals(row) {
 
   // 🔴 Breakout: AT 52-week high + volume surge
   if (row.price >= row.week52High * 0.999 && vr >= 1.5 && row.dayChangePct > 0.5) {
-    signals.push({ type: 'breakout', icon: '🔴', label: 'Breakout', color: '#DC2626' });
+    signals.push({ type: 'breakout', icon: '🔴', label: '突破', color: '#DC2626' });
   }
 
   // 🔵 Pullback: recently near 52w high, now pulled back 3–10%
@@ -26,12 +26,12 @@ export function getSignals(row) {
 
   // ⚠️ Overheated: >30% above 50-day MA
   if ((row.ma50Dev || 0) > 30) {
-    signals.push({ type: 'overheated', icon: '⚠️', label: '過熱(Stay)', color: '#9CA3AF' });
+    signals.push({ type: 'overheated', icon: '⚠️', label: '過熱', color: '#9CA3AF' });
   }
 
   // 💎 Deep Value: PBR < 1.0 (ROE > 10% is verified in the fundamentals popup)
   if (row.pbr > 0 && row.pbr < 1.0) {
-    signals.push({ type: 'deepValue', icon: '💎', label: 'DEEP VALUE', color: '#7C3AED' });
+    signals.push({ type: 'deepValue', icon: '💎', label: '割安', color: '#7C3AED' });
   }
 
   // 🏝️ Island Reversal Bottom: gap-down → isolated island → gap-up reversal
