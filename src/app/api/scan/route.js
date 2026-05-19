@@ -1,6 +1,7 @@
 import staticTickers from '../../../data/tickers.json';
 import { calcScore } from '../../../lib/scoring';
 import { getTrendMode } from '../../../lib/trend-analyzer';
+import { Resend } from 'resend';
 
 const UA        = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)';
 const BATCH     = 50;
@@ -373,6 +374,21 @@ export async function POST() {
       if (row.islandReversal) row.score = Math.min(100, row.score + 5);
     });
     rows.sort((a, b) => b.score - a.score);
+
+    // ブレイクアウト銘柄があればメール通知（fire-and-forget）
+    const breakouts = rows.filter(r => r.trendMode === 'breakout');
+    if (breakouts.length > 0 && process.env.RESEND_API_KEY && process.env.NOTIFY_EMAIL) {
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      const lines = breakouts.map(r =>
+        `🚀 ${r.ticker}  ${r.name || ''}\n   $${r.price?.toFixed(2)}  +${r.dayChangePct?.toFixed(1)}%  出来高 ${r.volRatio?.toFixed(1)}x  スコア ${r.score}`
+      ).join('\n\n');
+      resend.emails.send({
+        from: 'US Screener <onboarding@resend.dev>',
+        to:   process.env.NOTIFY_EMAIL,
+        subject: `🚀 ブレイクアウト検出 (${breakouts.length}件) — ${breakouts.map(r => r.ticker).join(', ')}`,
+        text: `US 52週高値スキャナー — ブレイクアウト通知\n\n${lines}\n\nhttps://global-high-screener.vercel.app`,
+      }).catch(() => {});
+    }
 
     return Response.json({
       rows,
