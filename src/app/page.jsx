@@ -85,12 +85,12 @@ const TREND_CFG = {
   exit:     { arrow: '↓', color: '#DC2626', label: '売り検討',  title: '↓ 要注意 — 大出来高でサポート割れ・売り検討' },
 };
 const WATCH_CFG = {
-  breakout: { arrow: '↑', color: '#16A34A', label: '今すぐエントリー', title: '【Breakout!】大出来高で52W高値を突破しました。今がエントリーのベストタイミングです。買ったその日に逆指値を入れること。' },
-  holding:  { arrow: '→', color: '#64748B', label: 'もう少し待て',     title: '【待機中】高値圏をキープしていますが、エントリーサインはまだ出ていません。出来高が急増するまで待ちましょう。' },
-  exit:     { arrow: '↓', color: '#DC2626', label: 'ウォッチ外す候補',  title: '【トレンド悪化】大出来高でサポートを割り込みました。エントリーせずウォッチリストから外すことを検討してください。' },
+  breakout: { arrow: '🚀', color: '#fff',    label: '今すぐエントリー', title: '【Breakout!】大出来高で52W高値を突破しました。今がエントリーのベストタイミングです。買ったその日に逆指値を入れること。' },
+  holding:  { arrow: '→',  color: '#64748B', label: 'もう少し待て',     title: '【待機中】高値圏をキープしていますが、エントリーサインはまだ出ていません。出来高が急増するまで待ちましょう。' },
+  exit:     { arrow: '↓',  color: '#DC2626', label: 'ウォッチ外す候補',  title: '【トレンド悪化】大出来高でサポートを割り込みました。エントリーせずウォッチリストから外すことを検討してください。' },
 };
 const SCAN_CFG = {
-  breakout: { arrow: '↑', color: '#16A34A', label: '急いで★追加！',   title: '【Breakout検出】今この銘柄が動き始めています。★を押してウォッチリストに追加し、購入を検討してください。' },
+  breakout: { arrow: '🚀', color: '#16A34A', label: '急いで★追加！',   title: '【Breakout検出】今この銘柄が動き始めています。★を押してウォッチリストに追加し、購入を検討してください。' },
   holding:  { arrow: '→', color: '#64748B', label: '★追加して待つ',   title: '【高値圏キープ中】まだエントリーサインは出ていません。★でウォッチリストに追加して、Breakoutを待ちましょう。' },
   exit:     { arrow: '↓', color: '#DC2626', label: '見送り推奨',       title: '【下降トレンド】大出来高でサポートを割り込んでいます。今は見送りを推奨します。' },
 };
@@ -112,10 +112,19 @@ function TrendLamp({ mode, showLabel = false, watchMode = false, scanMode = fals
   }
   const cfg = (watchMode ? WATCH_CFG : scanMode ? SCAN_CFG : TREND_CFG)[mode];
   if (!cfg) return null;
+  const isBreakout = mode === 'breakout';
   return (
     <span title={cfg.title}
-      style={{ display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0, color: cfg.color }}>
-      <span style={{ fontSize: 13, fontWeight: 700, lineHeight: 1 }}>{cfg.arrow}</span>
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0, color: cfg.color,
+        ...(isBreakout ? {
+          background: 'linear-gradient(135deg,#16A34A,#15803D)',
+          borderRadius: 8, padding: '3px 8px',
+          boxShadow: '0 0 10px rgba(22,163,74,0.55)',
+          border: '1px solid #4ADE80',
+        } : {}),
+      }}>
+      <span style={{ fontSize: isBreakout ? 16 : 13, fontWeight: 700, lineHeight: 1 }}>{cfg.arrow}</span>
       {showLabel && <span style={{ fontSize: 10, fontWeight: 700 }}>{cfg.label}</span>}
     </span>
   );
@@ -1011,7 +1020,7 @@ export default function Page() {
                 items: [
                   { badge: '→ 待機中',           bg: '#F8FAFC', color: '#64748B', border: '#CBD5E1', desc: 'エントリーサインまだ出ていない。出来高急増まで待つ' },
                   { badge: '→ もう少し待て',     bg: '#F8FAFC', color: '#64748B', border: '#CBD5E1', desc: '高値圏キープ中だがサインはまだ。出来高が急増するまで待つ' },
-                  { badge: '↑ 今すぐエントリー', bg: '#ECFDF5', color: '#16A34A', border: '#86EFAC', desc: '大出来高で52W高値突破。買ったその日に逆指値を入れる' },
+                  { badge: '🚀 今すぐエントリー', bg: 'linear-gradient(135deg,#16A34A,#15803D)', color: '#fff', border: '#4ADE80', desc: '大出来高で52W高値突破。買ったその日に逆指値を入れる' },
                   { badge: '↓ ウォッチ外す候補', bg: '#FEF2F2', color: '#DC2626', border: '#FECACA', desc: '大出来高でサポート割れ。エントリーせず外すことを検討' },
                 ],
               },
