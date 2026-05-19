@@ -7,7 +7,7 @@ const BATCH     = 50;
 const CONCURRENT = 6;
 const THRESHOLD  = 0.95;
 const MIN_CAP          = 1_000_000_000;  // $1B  — 下限
-const MAX_CAP          = 50_000_000_000; // $50B — Mid-Cap 上限
+const MAX_CAP          = 150_000_000_000; // $150B — Large-Cap 上限
 const MIN_REV_YOY      = 15;   // Rev YoY +15% 未満は除外
 const MAX_PSR          = 25;   // PSR 25倍超 = 投機バブル、除外
 const MIN_VOL_AVG      = 200_000; // 日平均20万株未満 = 流動性不足、除外
