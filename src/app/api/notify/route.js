@@ -65,9 +65,13 @@ function fmtCap(v) {
 }
 
 export async function GET(req) {
-  // Vercel Cron が付与する Bearer トークンで不正アクセスを防ぐ
+  // Vercel Cron が付与する Bearer トークン、またはテスト用クエリパラメータで認証
   const authHeader = req.headers.get('authorization');
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const testKey = new URL(req.url).searchParams.get('key');
+  const validToken = !process.env.CRON_SECRET
+    || authHeader === `Bearer ${process.env.CRON_SECRET}`
+    || testKey === process.env.CRON_SECRET;
+  if (!validToken) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
