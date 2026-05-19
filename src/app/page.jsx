@@ -1007,6 +1007,14 @@ export default function Page() {
                 ],
               },
               {
+                group: '→ ウォッチ状態',
+                items: [
+                  { badge: '→ 待機中',           bg: '#F8FAFC', color: '#64748B', border: '#CBD5E1', desc: 'エントリーサインまだ出ていない。出来高急増まで待つ' },
+                  { badge: '↑ 今すぐエントリー', bg: '#ECFDF5', color: '#16A34A', border: '#86EFAC', desc: '大出来高で52W高値突破。買ったその日に逆指値を入れる' },
+                  { badge: '↓ ウォッチ外す候補', bg: '#FEF2F2', color: '#DC2626', border: '#FECACA', desc: '大出来高でサポート割れ。エントリーせず外すことを検討' },
+                ],
+              },
+              {
                 group: 'ℹ️ その他',
                 items: [
                   { badge: '💎 割安',       bg: '#F5F3FF', color: '#7C3AED', border: '#DDD6FE', desc: 'PBR 1.0倍未満・純資産以下で割安' },
