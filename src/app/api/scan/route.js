@@ -5,7 +5,7 @@ import { getTrendMode } from '../../../lib/trend-analyzer';
 const UA        = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)';
 const BATCH     = 50;
 const CONCURRENT = 6;
-const THRESHOLD  = 0.95;
+const THRESHOLD  = 0.90;
 const MIN_CAP          = 1_000_000_000;  // $1B  — 下限
 const MAX_CAP          = 150_000_000_000; // $150B — Large-Cap 上限
 const MIN_REV_YOY      = 15;   // Rev YoY +15% 未満は除外
