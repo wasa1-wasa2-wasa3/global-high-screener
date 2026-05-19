@@ -1010,6 +1010,7 @@ export default function Page() {
                 group: '→ ウォッチ状態',
                 items: [
                   { badge: '→ 待機中',           bg: '#F8FAFC', color: '#64748B', border: '#CBD5E1', desc: 'エントリーサインまだ出ていない。出来高急増まで待つ' },
+                  { badge: '→ もう少し待て',     bg: '#F8FAFC', color: '#64748B', border: '#CBD5E1', desc: '高値圏キープ中だがサインはまだ。出来高が急増するまで待つ' },
                   { badge: '↑ 今すぐエントリー', bg: '#ECFDF5', color: '#16A34A', border: '#86EFAC', desc: '大出来高で52W高値突破。買ったその日に逆指値を入れる' },
                   { badge: '↓ ウォッチ外す候補', bg: '#FEF2F2', color: '#DC2626', border: '#FECACA', desc: '大出来高でサポート割れ。エントリーせず外すことを検討' },
                 ],
