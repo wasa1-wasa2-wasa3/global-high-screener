@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import AuthButton from '../components/AuthButton';
 import { getSignals } from '../lib/signals';
@@ -454,6 +454,7 @@ function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich,
 
 // ─── Page ──────────────────────────────────────────────────────────────────
 export default function Page() {
+  const userRef = useRef(null);
   const [scanResults, setScanResults] = useState([]);
   const [loading, setLoading]         = useState(false);
   const [usdJpy, setUsdJpy]           = useState(null);
@@ -494,6 +495,30 @@ export default function Page() {
       const wr = localStorage.getItem(WATCH_REFRESH_KEY);
       if (wr) setWatchRefreshedAt(wr);
     } catch {}
+  }, []);
+
+  useEffect(() => {
+    async function loadFromSupabase(u) {
+      const { data } = await supabase.from('watchlist')
+        .select('ticker, name, data, saved_at')
+        .eq('user_id', u.id).eq('list_type', 'scan');
+      if (!data?.length) return;
+      const wl = Object.fromEntries(
+        data.map(r => [r.ticker, { ...r.data, ticker: r.ticker, name: r.name, savedAt: r.saved_at }])
+      );
+      setWatchlist(wl);
+      try { localStorage.setItem(WATCH_KEY, JSON.stringify(wl)); } catch {}
+    }
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) { userRef.current = user; loadFromSupabase(user); }
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      const u = session?.user ?? null;
+      userRef.current = u;
+      if (u) loadFromSupabase(u);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -548,12 +573,25 @@ export default function Page() {
     setEnrichLoading(false);
   }
 
-  function toggleWatch(row) {
+  async function toggleWatch(row) {
     const next = { ...watchlist };
-    if (next[row.ticker]) { delete next[row.ticker]; }
+    const removing = !!next[row.ticker];
+    if (removing) { delete next[row.ticker]; }
     else { next[row.ticker] = { ...row, savedAt: new Date().toISOString() }; }
     setWatchlist(next);
-    localStorage.setItem(WATCH_KEY, JSON.stringify(next));
+    try { localStorage.setItem(WATCH_KEY, JSON.stringify(next)); } catch {}
+    const u = userRef.current;
+    if (u) {
+      if (removing) {
+        await supabase.from('watchlist').delete()
+          .eq('user_id', u.id).eq('list_type', 'scan').eq('ticker', row.ticker);
+      } else {
+        const { ticker, name, savedAt: _s, ...data } = next[row.ticker];
+        await supabase.from('watchlist').upsert({
+          user_id: u.id, list_type: 'scan', ticker, name: name || ticker, data,
+        }, { onConflict: 'user_id,list_type,ticker' });
+      }
+    }
   }
 
   function handleBuyToggle(ticker) {
