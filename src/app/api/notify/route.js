@@ -79,6 +79,19 @@ export async function GET(req) {
     return Response.json({ error: 'RESEND_API_KEY or NOTIFY_EMAIL not set' }, { status: 500 });
   }
 
+  // テスト送信モード
+  const isTest = new URL(req.url).searchParams.get('test') === 'true';
+  if (isTest) {
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    await resend.emails.send({
+      from: 'US Screener <onboarding@resend.dev>',
+      to:   process.env.NOTIFY_EMAIL,
+      subject: '🧪 テスト送信 — US 52週高値スキャナー',
+      text: 'テスト送信です。このメールが届いていれば通知設定は正常です。\n\nhttps://global-high-screener.vercel.app',
+    });
+    return Response.json({ sent: true, message: 'Test email sent' });
+  }
+
   try {
     const { crumb, cookie } = await getCrumb();
     const pages = await Promise.all(
