@@ -83,13 +83,14 @@ export async function GET(req) {
   const isTest = new URL(req.url).searchParams.get('test') === 'true';
   if (isTest) {
     const resend = new Resend(process.env.RESEND_API_KEY);
-    await resend.emails.send({
+    const { data, error } = await resend.emails.send({
       from: 'US Screener <onboarding@resend.dev>',
       to:   process.env.NOTIFY_EMAIL,
       subject: '🧪 テスト送信 — US 52週高値スキャナー',
       text: 'テスト送信です。このメールが届いていれば通知設定は正常です。\n\nhttps://global-high-screener.vercel.app',
     });
-    return Response.json({ sent: true, message: 'Test email sent' });
+    if (error) return Response.json({ sent: false, error: error.message ?? error }, { status: 500 });
+    return Response.json({ sent: true, message: 'Test email sent', id: data?.id });
   }
 
   try {
