@@ -681,6 +681,7 @@ export default function Page() {
     '時価総額':     r => r.marketCap ?? 0,
     'Rev YoY':      r => r.revenueGrowthYoy ?? 0,
     'Gross Mg':     r => r.grossMargin ?? 0,
+    'スコア':       r => r.score ?? 0,
   };
 
   function handleSort(col) {
@@ -1068,8 +1069,9 @@ export default function Page() {
                     </th>
                   );
                 })}
-                <th style={{ padding: '10px 10px', textAlign: 'left', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>
-                  <ScoreHeaderPopover />
+                <th onClick={() => handleSort('スコア')} className="sortable-th"
+                  style={{ padding: '10px 10px', textAlign: 'left', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap', color: sortField === 'スコア' ? GOLD2 : '#fff' }}>
+                  <ScoreHeaderPopover />{sortField === 'スコア' ? (sortDir === 'desc' ? ' ▼' : ' ▲') : ' ⇅'}
                 </th>
               </tr>
             </thead>
