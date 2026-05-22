@@ -474,6 +474,9 @@ export default function Page() {
   const [watchRefreshedAt, setWatchRefreshedAt] = useState(null);
   const [buyingTicker, setBuyingTicker]         = useState(null);
   const [buyForm, setBuyForm]                   = useState({ avgCost: '', shares: '' });
+  const [sortField, setSortField]               = useState(null);
+  const [sortDir, setSortDir]                   = useState('desc');
+  const tableScrollRef                          = useRef(null);
 
   useEffect(() => {
     if (!localStorage.getItem(GUIDE_KEY)) window.location.replace('/guide');
@@ -501,7 +504,7 @@ export default function Page() {
     async function loadFromSupabase(u) {
       const { data } = await supabase.from('watchlist')
         .select('ticker, name, data, saved_at')
-        .eq('user_id', u.id).eq('list_type', 'scan');
+        .eq('user_id', u.id).eq('list_type', LIST_TYPE);
       if (!data?.length) return;
       const wl = Object.fromEntries(
         data.map(r => [r.ticker, { ...r.data, ticker: r.ticker, name: r.name, savedAt: r.saved_at }])
@@ -584,11 +587,11 @@ export default function Page() {
     if (u) {
       if (removing) {
         await supabase.from('watchlist').delete()
-          .eq('user_id', u.id).eq('list_type', 'scan').eq('ticker', row.ticker);
+          .eq('user_id', u.id).eq('list_type', LIST_TYPE).eq('ticker', row.ticker);
       } else {
         const { ticker, name, savedAt: _s, ...data } = next[row.ticker];
         await supabase.from('watchlist').upsert({
-          user_id: u.id, list_type: 'scan', ticker, name: name || ticker, data,
+          user_id: u.id, list_type: LIST_TYPE, ticker, name: name || ticker, data,
         }, { onConflict: 'user_id,list_type,ticker' });
       }
     }
@@ -667,7 +670,38 @@ export default function Page() {
     (sectorFilter === 'all' || r.sector === sectorFilter)
   );
   const watchRows    = Object.values(watchlist);
-  const displayRows  = tab === 'scan' ? filteredRows : watchRows;
+  const baseRows     = tab === 'scan' ? filteredRows : watchRows;
+
+  const US_SORT_KEY_MAP = {
+    'ティッカー':   r => r.ticker,
+    '価格 (USD)':   r => r.regularMarketPrice ?? r.price ?? 0,
+    '前日比':       r => r.regularMarketChangePercent ?? r.dayChangePct ?? 0,
+    '52W高値比':    r => r.high52Pct ?? 0,
+    '出来高比':     r => r.volRatio ?? 0,
+    '時価総額':     r => r.marketCap ?? 0,
+    'Rev YoY':      r => r.revenueGrowthYoy ?? 0,
+    'Gross Mg':     r => r.grossMargin ?? 0,
+  };
+
+  function handleSort(col) {
+    if (!US_SORT_KEY_MAP[col]) return;
+    if (sortField === col) {
+      setSortDir(d => d === 'desc' ? 'asc' : 'desc');
+    } else {
+      setSortField(col);
+      setSortDir('desc');
+    }
+  }
+
+  const displayRows = sortField && US_SORT_KEY_MAP[sortField]
+    ? [...baseRows].sort((a, b) => {
+        const va = US_SORT_KEY_MAP[sortField](a);
+        const vb = US_SORT_KEY_MAP[sortField](b);
+        if (va < vb) return sortDir === 'desc' ? 1 : -1;
+        if (va > vb) return sortDir === 'desc' ? -1 : 1;
+        return 0;
+      })
+    : baseRows;
 
   return (
     <main style={{ maxWidth: 1200, margin: '0 auto', padding: '1.5rem 1rem', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
@@ -679,6 +713,8 @@ export default function Page() {
         .buy-pulse { animation: buyPulse 1.8s ease-in-out infinite; }
         .yf-chart-link { transition: color 0.15s, opacity 0.15s; }
         .yf-chart-link:hover { color: #C9A84C !important; opacity: 1 !important; text-decoration: underline; }
+        th.sortable-th { transition: background 0.15s, color 0.15s; cursor: pointer; user-select: none; }
+        th.sortable-th:hover { background: #1a3a6a !important; color: #F0C040 !important; }
       `}</style>
       {/* Nav */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', rowGap: 8 }}>
@@ -1009,13 +1045,29 @@ export default function Page() {
           ))}
         </div>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
+        <div style={{ position: 'relative' }}>
+          <div style={{ position: 'fixed', right: 64, top: '50%', transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column', gap: 6, zIndex: 100 }}>
+            <button onClick={() => tableScrollRef.current?.scrollBy({ left: -300, behavior: 'smooth' })}
+              style={{ fontSize: 15, width: 36, height: 36, borderRadius: 8, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', color: '#555', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>◀</button>
+            <button onClick={() => tableScrollRef.current?.scrollBy({ left: 300, behavior: 'smooth' })}
+              style={{ fontSize: 15, width: 36, height: 36, borderRadius: 8, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', color: '#555', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>▶</button>
+          </div>
+        <div ref={tableScrollRef} style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: NAVY, color: '#fff' }}>
-                {['', 'ティッカー', '価格 (USD)', 'JPY換算', '前日比', '52W高値比', '出来高比', '時価総額', 'Rev YoY', 'Gross Mg', 'シグナル'].map(h => (
-                  <th key={h} style={{ padding: '10px 10px', textAlign: 'left', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
+                {['', 'ティッカー', '価格 (USD)', 'JPY換算', '前日比', '52W高値比', '出来高比', '時価総額', 'Rev YoY', 'Gross Mg', 'シグナル'].map(h => {
+                  const sortable = !!US_SORT_KEY_MAP[h];
+                  const isActive = sortField === h;
+                  const arrow = isActive ? (sortDir === 'desc' ? ' ▼' : ' ▲') : (sortable ? ' ⇅' : '');
+                  return (
+                    <th key={h} onClick={sortable ? () => handleSort(h) : undefined}
+                      className={sortable ? 'sortable-th' : undefined}
+                      style={{ padding: '10px 10px', textAlign: 'left', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap', color: isActive ? GOLD2 : '#fff' }}>
+                      {h}{arrow}
+                    </th>
+                  );
+                })}
                 <th style={{ padding: '10px 10px', textAlign: 'left', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>
                   <ScoreHeaderPopover />
                 </th>
@@ -1030,6 +1082,7 @@ export default function Page() {
               ))}
             </tbody>
           </table>
+        </div>
         </div>
       )}
 
