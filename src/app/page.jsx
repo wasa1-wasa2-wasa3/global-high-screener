@@ -898,8 +898,8 @@ export default function Page() {
         <div style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: '50%', background: 'rgba(201,168,76,0.12)', pointerEvents: 'none' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
           <div>
-            <div style={{ fontSize: 11, letterSpacing: 3, color: GOLD, fontWeight: 700, marginBottom: 6 }}>GLOBAL HIGH SCREENER</div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700 }}>US 52週高値スキャナー</h1>
+            <div style={{ fontSize: 11, letterSpacing: 3, color: GOLD, fontWeight: 700, marginBottom: 6 }}>US STOCK SCREENER</div>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700 }}>💵 ドルドルくん</h1>
             <p style={{ margin: '6px 0 0', fontSize: 13, color: '#94A3B8' }}>
               Nasdaq / NYSE · {scannedCount ? `${scannedCount.toLocaleString()}銘柄をスキャン` : '最大1,000銘柄をスキャン'}
             </p>

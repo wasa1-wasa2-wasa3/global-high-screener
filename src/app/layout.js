@@ -1,5 +1,5 @@
 export const metadata = {
-  title: 'Global High Screener | US Edition',
+  title: 'ドルドルくん',
   description: 'US stock 52-week high screener for Nasdaq & NYSE',
 };
 
