@@ -136,12 +136,7 @@ function ScoreBadge({ score }) {
       <span style={{ fontSize: 11, fontWeight: 800, background: r.bg, color: r.color, border: `1px solid ${r.border}`, padding: '2px 6px', borderRadius: 5, letterSpacing: 0.5, lineHeight: 1 }}>
         {r.rank}
       </span>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: r.color, lineHeight: 1 }}>{score}</span>
-        <div style={{ width: 36, height: 4, background: '#E2E8F0', borderRadius: 2, overflow: 'hidden' }}>
-          <div style={{ width: `${Math.min(score, 100)}%`, height: '100%', background: r.bar, borderRadius: 2 }} />
-        </div>
-      </div>
+      <span style={{ fontSize: 12, fontWeight: 700, color: r.color, lineHeight: 1 }}>{score}</span>
     </div>
   );
 }
@@ -1046,28 +1041,6 @@ export default function Page() {
           ⚠️ スコア・ランクは仮説モデルによる参考値です。バックテストは未実施であり、将来の利益を保証するものではありません。投資判断はご自身の責任で行ってください。
         </div>
       )}
-
-      {/* STEP indicator */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 5, background: tab === 'scan' ? GOLD : '#F1F5F9', color: tab === 'scan' ? NAVY : '#94A3B8' }}>STEP ①</span>
-          <span style={{ fontSize: 11, color: tab === 'scan' ? NAVY : '#94A3B8', fontWeight: tab === 'scan' ? 700 : 400 }}>スキャン</span>
-          {tab === 'scan' && <span style={{ fontSize: 9, color: GOLD, fontWeight: 700 }}>◀ 現在地</span>}
-        </div>
-        <span style={{ color: '#CBD5E1', fontSize: 11 }}>→</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 5, background: tab === 'watchlist' ? GOLD : '#F1F5F9', color: tab === 'watchlist' ? NAVY : '#94A3B8' }}>STEP ②</span>
-          <span style={{ fontSize: 11, color: tab === 'watchlist' ? NAVY : '#94A3B8', fontWeight: tab === 'watchlist' ? 700 : 400 }}>ウォッチ</span>
-          {tab === 'watchlist' && <span style={{ fontSize: 9, color: GOLD, fontWeight: 700 }}>◀ 現在地</span>}
-        </div>
-        <span style={{ color: '#CBD5E1', fontSize: 11 }}>→</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <a href="/portfolio" style={{ textDecoration: 'none' }}>
-            <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 5, background: '#F1F5F9', color: '#94A3B8' }}>STEP ③</span>
-          </a>
-          <span style={{ fontSize: 11, color: '#94A3B8' }}>ポートフォリオ</span>
-        </div>
-      </div>
 
       {/* Stale warning */}
       {tab === 'watchlist' && watchRows.length > 0 && watchRefreshedAt && Date.now() - new Date(watchRefreshedAt) > WATCH_STALE_MS && (
