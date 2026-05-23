@@ -476,6 +476,7 @@ export default function Page() {
   const [buyForm, setBuyForm]                   = useState({ avgCost: '', shares: '' });
   const [sortField, setSortField]               = useState(null);
   const [sortDir, setSortDir]                   = useState('desc');
+  const [pipelineAlerts, setPipelineAlerts]     = useState([]);
   const tableScrollRef                          = useRef(null);
 
   useEffect(() => {
@@ -531,6 +532,11 @@ export default function Page() {
   useEffect(() => {
     try { localStorage.setItem(FILTER_KEY, JSON.stringify({ cap: capFilter, sector: sectorFilter })); } catch {}
   }, [capFilter, sectorFilter]);
+
+  useEffect(() => {
+    const alerts = Object.values(watchlist).filter(r => r.trendMode === 'breakout');
+    setPipelineAlerts(alerts);
+  }, [watchlist]);
 
   useEffect(() => {
     if (tab !== 'watchlist') return;
@@ -728,6 +734,63 @@ export default function Page() {
         </nav>
         <AuthButton />
       </div>
+
+      {/* Pipeline alert banner */}
+      {pipelineAlerts.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <style>{`
+            @keyframes alertPulse { 0%,100%{box-shadow:0 0 0 0 rgba(234,179,8,0.5)} 50%{box-shadow:0 0 0 10px rgba(234,179,8,0)} }
+            @keyframes starSpin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
+          `}</style>
+          <div style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%)', borderRadius: 12, padding: '12px 16px', animation: 'alertPulse 2s ease-in-out infinite', border: '2px solid #EAB308', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden', opacity: 0.15 }}>
+              {['🎊','🎉','⭐','💫','🌟'].map((e, i) => (
+                <span key={i} style={{ position: 'absolute', fontSize: 18, top: `${[10,60,30,70,20][i]}%`, left: `${[5,15,85,75,50][i]}%` }}>{e}</span>
+              ))}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <span style={{ fontSize: 20, display: 'inline-block', animation: 'starSpin 3s linear infinite' }}>🌟</span>
+              <span style={{ fontSize: 15, fontWeight: 800, background: 'linear-gradient(90deg, #EAB308, #F0C040)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                おめでとう！チャンス到来！
+              </span>
+              <span style={{ fontSize: 11, color: '#94A3B8', marginLeft: 'auto' }}>ウォッチ銘柄が動きました</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+              {pipelineAlerts.map(r => {
+                const reason = r.volRatio > 2.0 && r.dayChangePct > 3.0
+                  ? `🔥 出来高急増 ${r.volRatio?.toFixed(1)}x`
+                  : (r.high52Pct ?? 0) >= -1
+                    ? '📈 52W高値突破'
+                    : '🚀 Breakout検出';
+                return (
+                  <div key={r.ticker} style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 12px', border: '1px solid rgba(234,179,8,0.3)', minWidth: 140 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#F0C040' }}>{r.ticker}</div>
+                    <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 4 }}>{r.name}</div>
+                    <div style={{ fontSize: 11, color: '#fff', marginBottom: 2 }}>{reason}</div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{fmtPrice(r.regularMarketPrice ?? r.price)}</span>
+                      {r.dayChangePct != null && (
+                        <span style={{ fontSize: 11, color: r.dayChangePct >= 0 ? '#4ADE80' : '#F87171' }}>
+                          {r.dayChangePct >= 0 ? '+' : ''}{r.dayChangePct.toFixed(2)}%
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+              <button onClick={() => setTab('watchlist')}
+                style={{ background: 'linear-gradient(135deg, #EAB308, #F0C040)', color: '#1a1a2e', border: 'none', borderRadius: 8, padding: '10px 28px', fontWeight: 800, fontSize: 14, cursor: 'pointer', boxShadow: '0 2px 12px rgba(234,179,8,0.5)' }}>
+                🚀 今すぐウォッチリストを確認！
+              </button>
+            </div>
+            <div style={{ fontSize: 10, color: '#64748B', textAlign: 'center' }}>
+              ⚠️ 購入後は必ず逆指値注文を入れてください（-10%）
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Gemini enrich popup */}
       {enrichRow && (
