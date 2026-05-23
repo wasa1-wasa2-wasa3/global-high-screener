@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import AuthButton from '../components/AuthButton';
+import NavBar from '../components/NavBar';
 import { getSignals } from '../lib/signals';
 import { calcScore } from '../lib/scoring';
 
@@ -472,6 +473,9 @@ export default function Page() {
   const [sortField, setSortField]               = useState(null);
   const [sortDir, setSortDir]                   = useState('desc');
   const [pipelineAlerts, setPipelineAlerts]     = useState([]);
+  const [toast, setToast]                       = useState(null);
+  const [scrolled, setScrolled]                 = useState(false);
+  const toastTimer                              = useRef(null);
   const tableScrollRef                          = useRef(null);
 
   useEffect(() => {
@@ -483,6 +487,12 @@ export default function Page() {
     check();
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
+  }, []);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 300);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   useEffect(() => {
@@ -577,11 +587,17 @@ export default function Page() {
     setEnrichLoading(false);
   }
 
+  function showToast(msg) {
+    setToast(msg);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2200);
+  }
+
   async function toggleWatch(row) {
     const next = { ...watchlist };
     const removing = !!next[row.ticker];
     if (removing) { delete next[row.ticker]; }
-    else { next[row.ticker] = { ...row, savedAt: new Date().toISOString() }; }
+    else { next[row.ticker] = { ...row, savedAt: new Date().toISOString() }; showToast(`⭐ ${row.ticker} をウォッチリストに追加`); }
     setWatchlist(next);
     try { localStorage.setItem(WATCH_KEY, JSON.stringify(next)); } catch {}
     const u = userRef.current;
@@ -706,7 +722,7 @@ export default function Page() {
     : baseRows;
 
   return (
-    <main style={{ maxWidth: 1200, margin: '0 auto', padding: '1.5rem 1rem', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+    <main className="tb-main" style={{ maxWidth: 1200, margin: '0 auto', padding: '1.5rem 1rem', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', overflowX: 'hidden' }}>
       <style>{`
         @keyframes buyPulse {
           0%, 100% { box-shadow: 0 0 0 0 rgba(21,128,61,0.45); }
@@ -1178,6 +1194,15 @@ export default function Page() {
           </div>
         </details>
       )}
+      {toast && (
+        <div style={{ position: 'fixed', bottom: isMobile ? 80 : 28, left: '50%', transform: 'translateX(-50%)', background: '#0A1628', color: '#fff', padding: '10px 22px', borderRadius: 28, fontSize: 13, fontWeight: 600, zIndex: 400, whiteSpace: 'nowrap', boxShadow: '0 4px 16px rgba(0,0,0,0.25)', pointerEvents: 'none' }}>
+          {toast}
+        </div>
+      )}
+      {scrolled && (
+        <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} style={{ position: 'fixed', bottom: isMobile ? 88 : 28, right: 18, width: 44, height: 44, borderRadius: '50%', background: '#0A1628', color: '#C9A84C', border: 'none', cursor: 'pointer', fontSize: 18, zIndex: 200, boxShadow: '0 4px 14px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>↑</button>
+      )}
+      <NavBar />
     </main>
   );
 }

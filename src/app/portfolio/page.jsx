@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import AuthButton from '../../components/AuthButton';
+import NavBar from '../../components/NavBar';
 
 const NAVY  = '#0A1628';
 const NAVY2 = '#1E3A5F';
@@ -45,6 +46,7 @@ export default function PortfolioPage() {
   const [usdJpy, setUsdJpy]           = useState(null);
   const [isMobile, setIsMobile]       = useState(false);
   const [copiedTicker, setCopiedTicker] = useState(null);
+  const [scrolled, setScrolled]         = useState(false);
   const [breakoutAlerts, setBreakoutAlerts] = useState([]);
   const [entryPopup, setEntryPopup]   = useState(null);
   const [popupShares, setPopupShares] = useState('');
@@ -57,6 +59,12 @@ export default function PortfolioPage() {
     check();
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
+  }, []);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 300);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   useEffect(() => {
@@ -296,7 +304,7 @@ export default function PortfolioPage() {
   })();
 
   return (
-    <main style={{ maxWidth: 1200, margin: '0 auto', padding: '1.5rem 1rem', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+    <main className="tb-main" style={{ maxWidth: 1200, margin: '0 auto', padding: '1.5rem 1rem', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', overflowX: 'hidden' }}>
 
       {/* Nav */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', rowGap: 8 }}>
@@ -821,6 +829,10 @@ export default function PortfolioPage() {
           </div>
         </details>
       )}
+      {scrolled && (
+        <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} style={{ position: 'fixed', bottom: isMobile ? 88 : 28, right: 18, width: 44, height: 44, borderRadius: '50%', background: '#0A1628', color: '#C9A84C', border: 'none', cursor: 'pointer', fontSize: 18, zIndex: 200, boxShadow: '0 4px 14px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>↑</button>
+      )}
+      <NavBar />
     </main>
   );
 }
