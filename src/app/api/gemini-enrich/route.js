@@ -1,10 +1,14 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const PROMPT = (ticker, name) =>
+  `あなたは米国株の構造分析アシスタントです。投資推奨・価格予測・買い推奨は行いません。` +
   `US株 ${ticker}（${name}）についてウェブ検索し、必ずこのJSON1行だけを返せ（マークダウン不要）。` +
-  `{"reason":"<この銘柄が現在52週高値付近にいる主な理由を3行の日本語で。\\nで改行。各行は簡潔に>",` +
+  `{"businessModel":"<ビジネスモデルを2文以内の日本語で。何を売り誰が顧客か>",` +
+  `"growthDrivers":"<現在の成長ドライバーを3点。\\nで区切る。例: AI需要拡大\\nクラウド移行加速\\nARR積み上げ>",` +
+  `"riskFactors":"<主なリスクを2点。\\nで区切る。例: 競合激化\\n景気敏感>",` +
   `"earningsYoY":<直近四半期の売上高前年同期比%の数値またはnull>,` +
-  `"earningsEval":"<直近決算の評価を30字以内の日本語で。例: 増収増益・AI需要継続>"}`;
+  `"earningsEval":"<直近決算の事実のみを30字以内で。例: 増収増益・ガイダンス上方修正>"}` +
+  `※「買い」「売り」「目標株価」「おすすめ」などの投資判断は含めないこと。`;
 
 export async function POST(request) {
   try {
@@ -32,9 +36,13 @@ export async function POST(request) {
 
     const data = JSON.parse(match[0]);
     return Response.json({
-      reason:       typeof data.reason       === 'string' ? data.reason       : null,
-      earningsYoY:  typeof data.earningsYoY  === 'number' ? data.earningsYoY  : null,
-      earningsEval: typeof data.earningsEval === 'string' ? data.earningsEval : null,
+      businessModel: typeof data.businessModel === 'string' ? data.businessModel : null,
+      growthDrivers: typeof data.growthDrivers === 'string' ? data.growthDrivers : null,
+      riskFactors:   typeof data.riskFactors   === 'string' ? data.riskFactors   : null,
+      earningsYoY:   typeof data.earningsYoY   === 'number' ? data.earningsYoY   : null,
+      earningsEval:  typeof data.earningsEval  === 'string' ? data.earningsEval  : null,
+      // 後方互換: 旧 reason フィールドは growthDrivers で代替
+      reason: typeof data.businessModel === 'string' ? data.businessModel : null,
     });
   } catch (e) {
     return Response.json({ error: e.message }, { status: 500 });

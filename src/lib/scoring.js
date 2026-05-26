@@ -92,6 +92,15 @@ export function calcScore(row) {
     else if (rs >= 1.0) score += 3;
   }
 
+  // 10. Rule of 40 (0-20pt): RevenueGrowth% + FCFMargin% — 成長とキャッシュ創出の両立
+  const r40 = row.ruleOf40;
+  if (r40 != null) {
+    if      (r40 >= 60) score += 20;
+    else if (r40 >= 50) score += 15;
+    else if (r40 >= 40) score += 10;
+    else if (r40 >= 30) score += 5;
+  }
+
   let result = Math.min(100, score);
 
   // A. ≤$2B 超小型マルチプライヤー × 1.2（10倍成長の余地が最も大きいため）

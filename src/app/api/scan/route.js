@@ -178,6 +178,15 @@ function normalizeSector(s) {
   return SECTOR_NORM[s] ?? s;
 }
 
+function applySectorCap(rows, max = 3) {
+  const counts = {};
+  return rows.filter(r => {
+    const s = r.sector || 'Unknown';
+    counts[s] = (counts[s] || 0) + 1;
+    return counts[s] <= max;
+  });
+}
+
 // ─── Quote マッピング ──────────────────────────────────────────────────────
 
 function mapQuote(q, meta) {
@@ -255,14 +264,19 @@ async function fetchOneFundamentals(ticker, crumb, cookie) {
       }
     }
 
-    return {
-      ticker,
-      revenueGrowthYoy: fd.revenueGrowth?.raw != null
-        ? Math.round(fd.revenueGrowth.raw * 1000) / 10 : null,
-      grossMargin: fd.grossMargins?.raw != null
-        ? Math.round(fd.grossMargins.raw * 1000) / 10 : null,
-      revCAGR3Y,
-    };
+    const revenueGrowthYoy = fd.revenueGrowth?.raw != null
+      ? Math.round(fd.revenueGrowth.raw * 1000) / 10 : null;
+    const grossMargin = fd.grossMargins?.raw != null
+      ? Math.round(fd.grossMargins.raw * 1000) / 10 : null;
+
+    const fcf = fd.freeCashflow?.raw;
+    const rev = fd.totalRevenue?.raw;
+    const fcfMargin = fcf != null && rev != null && rev > 0
+      ? Math.round(fcf / rev * 1000) / 10 : null;
+    const ruleOf40 = revenueGrowthYoy != null && fcfMargin != null
+      ? Math.round(revenueGrowthYoy + fcfMargin) : null;
+
+    return { ticker, revenueGrowthYoy, grossMargin, revCAGR3Y, fcfMargin, ruleOf40 };
   } catch {
     clearTimeout(timer);
     return { ticker };
@@ -335,10 +349,12 @@ export async function POST() {
     const fundMap = await enrichCandidates(candidates, crumb, cookie);
     const enriched = candidates.map(row => {
       const f = fundMap[row.ticker];
-      if (f?.revenueGrowthYoy != null || f?.grossMargin != null || f?.revCAGR3Y != null) {
-        row.revenueGrowthYoy = f.revenueGrowthYoy ?? null;
-        row.grossMargin      = f.grossMargin      ?? null;
-        row.revCAGR3Y        = f.revCAGR3Y        ?? null;
+      if (f) {
+        if (f.revenueGrowthYoy != null) row.revenueGrowthYoy = f.revenueGrowthYoy;
+        if (f.grossMargin      != null) row.grossMargin      = f.grossMargin;
+        if (f.revCAGR3Y        != null) row.revCAGR3Y        = f.revCAGR3Y;
+        if (f.fcfMargin        != null) row.fcfMargin        = f.fcfMargin;
+        if (f.ruleOf40         != null) row.ruleOf40         = f.ruleOf40;
         row.score = calcScore(row);
       }
       return row;
@@ -374,9 +390,10 @@ export async function POST() {
       if (row.islandReversal) row.score = Math.min(100, row.score + 5);
     });
     rows.sort((a, b) => b.score - a.score);
+    const capped = applySectorCap(rows);
 
     // ブレイクアウト銘柄があればメール通知（fire-and-forget）
-    const breakouts = rows.filter(r => r.trendMode === 'breakout');
+    const breakouts = capped.filter(r => r.trendMode === 'breakout');
     if (breakouts.length > 0 && process.env.RESEND_API_KEY && process.env.NOTIFY_EMAIL) {
       const resend = new Resend(process.env.RESEND_API_KEY);
       const lines = breakouts.map(r =>
@@ -391,7 +408,7 @@ export async function POST() {
     }
 
     return Response.json({
-      rows,
+      rows: capped,
       scannedCount,
       scannedAt: new Date().toISOString(),
       source: screenerHasFull ? 'screener' : screenerOk ? 'screener+v7' : 'static',

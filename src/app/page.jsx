@@ -451,8 +451,10 @@ function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich,
 // ─── Page ──────────────────────────────────────────────────────────────────
 export default function Page() {
   const userRef = useRef(null);
-  const [scanResults, setScanResults] = useState([]);
-  const [loading, setLoading]         = useState(false);
+  const [scanResults, setScanResults]     = useState([]);
+  const [hiddenResults, setHiddenResults] = useState([]);
+  const [loading, setLoading]             = useState(false);
+  const [hiddenLoading, setHiddenLoading] = useState(false);
   const [usdJpy, setUsdJpy]           = useState(null);
   const [watchlist, setWatchlist]     = useState({});
   const [tab, setTab]                 = useState('scan');
@@ -566,6 +568,23 @@ export default function Page() {
       setErrorMsg('スキャンに失敗しました: ' + e.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function runHiddenScan() {
+    setHiddenLoading(true);
+    setErrorMsg(null);
+    try {
+      const res  = await fetch('/api/hidden-scan', { method: 'POST' });
+      const data = await res.json();
+      if (data.error) { setErrorMsg(data.error); return; }
+      setHiddenResults(data.rows || []);
+      setScannedAt(data.scannedAt);
+      setScannedCount(data.scannedCount || null);
+    } catch (e) {
+      setErrorMsg('Hidden スキャンに失敗しました: ' + e.message);
+    } finally {
+      setHiddenLoading(false);
     }
   }
 
@@ -687,7 +706,7 @@ export default function Page() {
     (sectorFilter === 'all' || r.sector === sectorFilter)
   );
   const watchRows    = Object.values(watchlist);
-  const baseRows     = tab === 'scan' ? filteredRows : watchRows;
+  const baseRows     = tab === 'scan' ? filteredRows : tab === 'hidden' ? hiddenResults : watchRows;
 
   const US_SORT_KEY_MAP = {
     'ティッカー':   r => r.ticker,
@@ -990,12 +1009,25 @@ export default function Page() {
 
       {/* Controls */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button onClick={runScan} disabled={loading}
-          style={{ padding: '11px 24px', background: loading ? '#94A3B8' : `linear-gradient(135deg,${GOLD},${GOLD2})`, color: NAVY, border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: loading ? 'not-allowed' : 'pointer', minHeight: 44, boxShadow: loading ? 'none' : '0 2px 8px rgba(201,168,76,0.35)' }}>
-          {loading ? '⏳ スキャン中 (10〜20秒)...' : '🔍 52週高値スキャン実行'}
-        </button>
+        {tab !== 'hidden' ? (
+          <button onClick={runScan} disabled={loading}
+            style={{ padding: '11px 24px', background: loading ? '#94A3B8' : `linear-gradient(135deg,${GOLD},${GOLD2})`, color: NAVY, border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: loading ? 'not-allowed' : 'pointer', minHeight: 44, boxShadow: loading ? 'none' : '0 2px 8px rgba(201,168,76,0.35)' }}>
+            {loading ? '⏳ スキャン中 (10〜20秒)...' : '🔍 52週高値スキャン実行'}
+          </button>
+        ) : (
+          <button onClick={runHiddenScan} disabled={hiddenLoading}
+            style={{ padding: '11px 24px', background: hiddenLoading ? '#94A3B8' : 'linear-gradient(135deg,#1D4ED8,#3B82F6)', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: hiddenLoading ? 'not-allowed' : 'pointer', minHeight: 44, boxShadow: hiddenLoading ? 'none' : '0 2px 8px rgba(59,130,246,0.35)' }}>
+            {hiddenLoading ? '⏳ Hidden スキャン中 (約2〜3分)...' : '🔍 Hidden Growth スキャン実行'}
+          </button>
+        )}
         {scannedAt && <span style={{ fontSize: 12, color: '#888' }}>最終: {new Date(scannedAt).toLocaleString('ja-JP')}</span>}
+        {tab === 'hidden' && hiddenResults.length > 0 && (
+          <span style={{ fontSize: 12, color: '#1D4ED8', background: '#EFF6FF', padding: '4px 10px', borderRadius: 6, border: '1px solid #BFDBFE' }}>
+            月次±5%以内・出来高静か・売上成長≥25%
+          </span>
+        )}
         <select value={capFilter} onChange={e => setCapFilter(e.target.value)}
+          style={{ display: tab === 'hidden' ? 'none' : undefined }}
           style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 13, cursor: 'pointer', minHeight: 44 }}>
           <option value="all">規模: すべて ($1B–$150B)</option>
           <option value="micro">Micro-Cap ($1B–$2B) ×1.2 ボーナス</option>
@@ -1003,7 +1035,7 @@ export default function Page() {
           <option value="mid">Mid-Cap ($10B–$50B)</option>
           <option value="large">Large-Cap ($50B–$150B)</option>
         </select>
-        {sectors.length > 2 && (
+        {sectors.length > 2 && tab !== 'hidden' && (
           <select value={sectorFilter} onChange={e => setSectorFilter(e.target.value)}
             style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 13, cursor: 'pointer', minHeight: 44 }}>
             {sectors.map(s => (
@@ -1026,8 +1058,9 @@ export default function Page() {
       {/* Tabs */}
       <div style={{ display: 'flex', alignItems: 'center', borderBottom: '2px solid #E2E8F0', marginBottom: 16 }}>
         {[
-          ['scan',      `スキャン結果${filteredRows.length > 0 ? ` (${filteredRows.length})` : ''}`],
-          ['watchlist', `ウォッチリスト${watchRows.length > 0 ? ` (${watchRows.length})` : ''}`],
+          ['scan',      `📈 Momentum${filteredRows.length > 0 ? ` (${filteredRows.length})` : ''}`],
+          ['hidden',    `🔵 Hidden${hiddenResults.length > 0 ? ` (${hiddenResults.length})` : ''}`],
+          ['watchlist', `⭐ ウォッチリスト${watchRows.length > 0 ? ` (${watchRows.length})` : ''}`],
         ].map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
             style={{ padding: '8px 16px', border: 'none', cursor: 'pointer', background: 'transparent', fontWeight: tab === key ? 700 : 400, color: tab === key ? NAVY : '#888', borderBottom: tab === key ? `2px solid ${NAVY}` : '2px solid transparent', fontSize: 13, marginBottom: -2, whiteSpace: 'nowrap' }}>
@@ -1069,10 +1102,21 @@ export default function Page() {
       {displayRows.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94A3B8' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>
-            {tab === 'watchlist' ? '⭐' : scannedAt ? '🔎' : '🔍'}
+            {tab === 'watchlist' ? '⭐' : tab === 'hidden' ? '🔵' : scannedAt ? '🔎' : '🔍'}
           </div>
           {tab === 'watchlist' ? (
             <p style={{ fontSize: 14 }}>★ボタンで銘柄をウォッチリストに追加してください</p>
+          ) : tab === 'hidden' ? (
+            <div>
+              <p style={{ fontSize: 15, fontWeight: 700, color: '#374151', marginBottom: 6 }}>
+                {hiddenResults.length === 0 ? 'Hidden Growth スキャンを実行してください' : 'Hidden Growth 条件に該当する銘柄がありません'}
+              </p>
+              <p style={{ fontSize: 13, lineHeight: 1.7, maxWidth: 400, margin: '0 auto', color: '#94A3B8' }}>
+                月次騰落 ±5%以内・出来高静か・売上成長 ≥25% の<br />
+                「まだ動いていない高成長株」を抽出します。<br />
+                スキャンには約2〜3分かかります。
+              </p>
+            </div>
           ) : scannedAt ? (
             <div>
               <p style={{ fontSize: 15, fontWeight: 700, color: '#374151', marginBottom: 6 }}>
