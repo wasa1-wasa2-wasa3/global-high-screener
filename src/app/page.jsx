@@ -12,7 +12,8 @@ const GOLD  = '#C9A84C';
 const GOLD2 = '#F0C040';
 
 const WATCH_KEY     = 'us_watchlist_v1';
-const LAST_SCAN_KEY = 'us_scan_last_v1';
+const LAST_SCAN_KEY   = 'us_scan_last_v1';
+const HIDDEN_SCAN_KEY = 'us_hidden_scan_v1';
 const GUIDE_KEY     = 'guide_seen_us_v1';
 const FILTER_KEY    = 'us_filter_v2'; // v2: default 'all'、旧 'small' キャッシュをリセット
 const LIST_TYPE         = 'us_scan';
@@ -501,6 +502,8 @@ export default function Page() {
     try {
       const saved = localStorage.getItem(LAST_SCAN_KEY);
       if (saved) { const d = JSON.parse(saved); setScanResults(d.rows || []); setScannedAt(d.scannedAt); if (d.scannedCount) setScannedCount(d.scannedCount); }
+      const savedHidden = localStorage.getItem(HIDDEN_SCAN_KEY);
+      if (savedHidden) { const d = JSON.parse(savedHidden); setHiddenResults(d.rows || []); }
       const wl = localStorage.getItem(WATCH_KEY);
       if (wl) setWatchlist(JSON.parse(wl));
       const wr = localStorage.getItem(WATCH_REFRESH_KEY);
@@ -581,6 +584,7 @@ export default function Page() {
       setHiddenResults(data.rows || []);
       setScannedAt(data.scannedAt);
       setScannedCount(data.scannedCount || null);
+      try { localStorage.setItem(HIDDEN_SCAN_KEY, JSON.stringify({ rows: data.rows, scannedAt: data.scannedAt })); } catch {}
     } catch (e) {
       setErrorMsg('Hidden スキャンに失敗しました: ' + e.message);
     } finally {
