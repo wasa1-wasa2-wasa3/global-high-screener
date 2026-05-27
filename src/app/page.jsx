@@ -13,7 +13,9 @@ const GOLD2 = '#F0C040';
 
 const WATCH_KEY     = 'us_watchlist_v1';
 const LAST_SCAN_KEY   = 'us_scan_last_v1';
-const HIDDEN_SCAN_KEY = 'us_hidden_scan_v1';
+const HIDDEN_SCAN_KEY    = 'us_hidden_scan_v1';
+const BREAKOUT_HIST_KEY  = 'us_breakout_history_v1';
+const BREAKOUT_HIST_MAX  = 50; // 最大保持件数
 const GUIDE_KEY     = 'guide_seen_us_v1';
 const FILTER_KEY    = 'us_filter_v2'; // v2: default 'all'、旧 'small' キャッシュをリセット
 const LIST_TYPE         = 'us_scan';
@@ -453,8 +455,9 @@ function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich,
 export default function Page() {
   const userRef = useRef(null);
   const [scanResults, setScanResults]     = useState([]);
-  const [hiddenResults, setHiddenResults] = useState([]);
-  const [loading, setLoading]             = useState(false);
+  const [hiddenResults, setHiddenResults]       = useState([]);
+  const [breakoutHistory, setBreakoutHistory]   = useState([]);
+  const [loading, setLoading]                   = useState(false);
   const [hiddenLoading, setHiddenLoading] = useState(false);
   const [usdJpy, setUsdJpy]           = useState(null);
   const [watchlist, setWatchlist]     = useState({});
@@ -504,6 +507,8 @@ export default function Page() {
       if (saved) { const d = JSON.parse(saved); setScanResults(d.rows || []); setScannedAt(d.scannedAt); if (d.scannedCount) setScannedCount(d.scannedCount); }
       const savedHidden = localStorage.getItem(HIDDEN_SCAN_KEY);
       if (savedHidden) { const d = JSON.parse(savedHidden); setHiddenResults(d.rows || []); }
+      const savedHist = localStorage.getItem(BREAKOUT_HIST_KEY);
+      if (savedHist) setBreakoutHistory(JSON.parse(savedHist));
       const wl = localStorage.getItem(WATCH_KEY);
       if (wl) setWatchlist(JSON.parse(wl));
       const wr = localStorage.getItem(WATCH_REFRESH_KEY);
@@ -563,10 +568,23 @@ export default function Page() {
       const res  = await fetch('/api/scan', { method: 'POST' });
       const data = await res.json();
       if (data.error) { setErrorMsg(data.error); return; }
-      setScanResults(data.rows || []);
+      const rows = data.rows || [];
+      setScanResults(rows);
       setScannedAt(data.scannedAt);
       setScannedCount(data.scannedCount || null);
-      localStorage.setItem(LAST_SCAN_KEY, JSON.stringify({ rows: data.rows, scannedAt: data.scannedAt, scannedCount: data.scannedCount }));
+      localStorage.setItem(LAST_SCAN_KEY, JSON.stringify({ rows, scannedAt: data.scannedAt, scannedCount: data.scannedCount }));
+
+      // ブレイクアウト銘柄を履歴に追記
+      const newBreakouts = rows.filter(r => r.trendMode === 'breakout');
+      if (newBreakouts.length > 0) {
+        const detectedAt = data.scannedAt || new Date().toISOString();
+        const entries = newBreakouts.map(r => ({ ...r, detectedAt }));
+        setBreakoutHistory(prev => {
+          const merged = [...entries, ...prev].slice(0, BREAKOUT_HIST_MAX);
+          try { localStorage.setItem(BREAKOUT_HIST_KEY, JSON.stringify(merged)); } catch {}
+          return merged;
+        });
+      }
     } catch (e) {
       setErrorMsg('スキャンに失敗しました: ' + e.message);
     } finally {
@@ -1065,6 +1083,7 @@ export default function Page() {
           ['scan',      `📈 Momentum${filteredRows.length > 0 ? ` (${filteredRows.length})` : ''}`],
           ['hidden',    `🔵 Hidden${hiddenResults.length > 0 ? ` (${hiddenResults.length})` : ''}`],
           ['watchlist', `⭐ ウォッチリスト${watchRows.length > 0 ? ` (${watchRows.length})` : ''}`],
+          ['history',   `📬 通知履歴${breakoutHistory.length > 0 ? ` (${breakoutHistory.length})` : ''}`],
         ].map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
             style={{ padding: '8px 16px', border: 'none', cursor: 'pointer', background: 'transparent', fontWeight: tab === key ? 700 : 400, color: tab === key ? NAVY : '#888', borderBottom: tab === key ? `2px solid ${NAVY}` : '2px solid transparent', fontSize: 13, marginBottom: -2, whiteSpace: 'nowrap' }}>
@@ -1106,7 +1125,7 @@ export default function Page() {
       {displayRows.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94A3B8' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>
-            {tab === 'watchlist' ? '⭐' : tab === 'hidden' ? '🔵' : scannedAt ? '🔎' : '🔍'}
+            {tab === 'watchlist' ? '⭐' : tab === 'hidden' ? '🔵' : tab === 'history' ? '📬' : scannedAt ? '🔎' : '🔍'}
           </div>
           {tab === 'watchlist' ? (
             <p style={{ fontSize: 14 }}>★ボタンで銘柄をウォッチリストに追加してください</p>
@@ -1186,6 +1205,73 @@ export default function Page() {
           </table>
         </div>
         </div>
+      )}
+
+      {/* 通知履歴タブ */}
+      {tab === 'history' && (
+        breakoutHistory.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94A3B8' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>📬</div>
+            <p style={{ fontSize: 14 }}>スキャンでブレイクアウト銘柄が検出されると、ここに記録されます</p>
+          </div>
+        ) : (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <span style={{ fontSize: 12, color: '#64748B' }}>直近{breakoutHistory.length}件のブレイクアウト通知（このデバイスのみ）</span>
+              <button onClick={() => {
+                setBreakoutHistory([]);
+                try { localStorage.removeItem(BREAKOUT_HIST_KEY); } catch {}
+              }} style={{ fontSize: 11, color: '#DC2626', background: 'none', border: '1px solid #FCA5A5', borderRadius: 6, padding: '3px 10px', cursor: 'pointer' }}>
+                履歴をクリア
+              </button>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: NAVY, color: '#fff' }}>
+                    {['検出日時', 'ティッカー', '価格 (USD)', 'JPY換算', '前日比', '出来高比', '時価総額', 'Rev YoY', 'Gross Mg', 'スコア'].map(h => (
+                      <th key={h} style={{ padding: '10px 10px', textAlign: 'left', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {breakoutHistory.map((r, i) => (
+                    <tr key={`${r.ticker}-${r.detectedAt}-${i}`}
+                      style={{ background: i % 2 === 0 ? '#fff' : '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
+                      <td style={{ padding: '10px', whiteSpace: 'nowrap', fontSize: 11, color: '#64748B' }}>
+                        {new Date(r.detectedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td style={{ padding: '10px', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontWeight: 700, color: NAVY }}>{r.ticker}</span>
+                        <div style={{ fontSize: 10, color: '#94A3B8', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
+                      </td>
+                      <td style={{ padding: '10px', fontWeight: 600 }}>{fmtPrice(r.price)}</td>
+                      <td style={{ padding: '10px', fontSize: 11, color: '#64748B' }}>{fmtJPY(r.price, usdJpy)}</td>
+                      <td style={{ padding: '10px', color: (r.dayChangePct ?? 0) >= 0 ? '#16A34A' : '#DC2626', fontWeight: 600 }}>
+                        {r.dayChangePct != null ? `+${r.dayChangePct.toFixed(1)}%` : '—'}
+                      </td>
+                      <td style={{ padding: '10px' }}>{r.volRatio != null ? `${r.volRatio.toFixed(1)}x` : '—'}</td>
+                      <td style={{ padding: '10px' }}>{fmtMktCap(r.marketCap)}</td>
+                      <td style={{ padding: '10px', color: '#16A34A', fontWeight: 600 }}>
+                        {r.revenueGrowthYoy != null ? `+${r.revenueGrowthYoy.toFixed(1)}%` : '—'}
+                      </td>
+                      <td style={{ padding: '10px' }}>
+                        {r.grossMargin != null ? `${r.grossMargin.toFixed(1)}%` : '—'}
+                      </td>
+                      <td style={{ padding: '10px' }}>
+                        {r.score != null ? (
+                          <span style={{ fontWeight: 700, background: r.score >= 80 ? '#FEF3C7' : r.score >= 70 ? '#DCFCE7' : '#F1F5F9', color: r.score >= 80 ? '#92400E' : r.score >= 70 ? '#15803D' : '#475569', padding: '2px 8px', borderRadius: 6 }}>
+                            {r.score}
+                          </span>
+                        ) : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
       )}
 
       {/* Signal legend */}
