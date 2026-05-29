@@ -728,7 +728,7 @@ export default function Page() {
     (sectorFilter === 'all' || r.sector === sectorFilter)
   );
   const watchRows    = Object.values(watchlist);
-  const baseRows     = tab === 'scan' ? filteredRows : tab === 'hidden' ? hiddenResults : watchRows;
+  const baseRows     = tab === 'scan' ? filteredRows : tab === 'hidden' ? hiddenResults : tab === 'history' ? [] : watchRows;
 
   const US_SORT_KEY_MAP = {
     'ティッカー':   r => r.ticker,
@@ -1123,9 +1123,10 @@ export default function Page() {
 
       {/* Results */}
       {displayRows.length === 0 ? (
+        tab !== 'history' && (
         <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94A3B8' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>
-            {tab === 'watchlist' ? '⭐' : tab === 'hidden' ? '🔵' : tab === 'history' ? '📬' : scannedAt ? '🔎' : '🔍'}
+            {tab === 'watchlist' ? '⭐' : tab === 'hidden' ? '🔵' : scannedAt ? '🔎' : '🔍'}
           </div>
           {tab === 'watchlist' ? (
             <p style={{ fontSize: 14 }}>★ボタンで銘柄をウォッチリストに追加してください</p>
@@ -1155,6 +1156,7 @@ export default function Page() {
             <p style={{ fontSize: 14 }}>「52週高値スキャン実行」ボタンを押すと、52週高値圏の銘柄が表示されます</p>
           )}
         </div>
+        )
       ) : isMobile ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {displayRows.map(r => (
