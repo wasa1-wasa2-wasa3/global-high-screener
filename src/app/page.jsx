@@ -1328,6 +1328,38 @@ export default function Page() {
               </div>
             ))}
           </div>
+
+          {/* 保有期間の目安 + 免責事項 */}
+          <div style={{ marginTop: 14, border: '1px solid #E2E8F0', borderRadius: 10, overflow: 'hidden' }}>
+            <div style={{ padding: '6px 14px', background: '#F8FAFC', fontSize: 11, fontWeight: 700, color: '#64748B', borderBottom: '1px solid #E2E8F0' }}>⏱️ 保有期間の目安（参考）</div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: '#F8FAFC' }}>
+                    {['スタイル', '期間', '特徴'].map(h => (
+                      <th key={h} style={{ padding: '7px 14px', textAlign: 'left', fontWeight: 700, color: '#64748B', borderBottom: '1px solid #E2E8F0' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { style: 'スイング',       period: '2〜8週間',  desc: 'ブレイクアウト後の初動を取る' },
+                    { style: '中期保有',       period: '3〜12ヶ月', desc: 'トレンドが続く限り保有' },
+                    { style: 'テンバガー狙い', period: '1〜5年',    desc: 'ファンダメンタルが崩れるまで' },
+                  ].map((r, i) => (
+                    <tr key={r.style} style={{ background: i % 2 === 0 ? '#fff' : '#FAFAFA' }}>
+                      <td style={{ padding: '8px 14px', fontWeight: 600, color: '#374151', borderBottom: '1px solid #F1F5F9' }}>{r.style}</td>
+                      <td style={{ padding: '8px 14px', color: '#16A34A', fontWeight: 700, borderBottom: '1px solid #F1F5F9', whiteSpace: 'nowrap' }}>{r.period}</td>
+                      <td style={{ padding: '8px 14px', color: '#64748B', borderBottom: '1px solid #F1F5F9' }}>{r.desc}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ padding: '8px 14px', background: '#FFFBEB', borderTop: '1px solid #FDE68A', fontSize: 11, color: '#92400E', lineHeight: 1.6 }}>
+              ⚠️ 投資判断はご自身の責任で行ってください。スコア・ランクは仮説モデルによる参考値であり、バックテストは未実施です。将来の利益を保証するものではありません。
+            </div>
+          </div>
         </details>
       )}
       {toast && (
