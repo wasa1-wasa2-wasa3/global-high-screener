@@ -84,12 +84,12 @@ export function calcScore(row) {
   // 8. 成長効率ボーナス (0-8pt): Rev YoY ≥ 30% かつ PSR < 15 = 成長に対して割安
   if ((rg || 0) >= 30 && psr != null && psr > 0 && psr < 15) score += 8;
 
-  // 9. RS vs QQQ (0-8pt): 1年相対強度 — 市場全体を大きく上回る銘柄を優遇
   const rs = row.rs;
   if (rs != null) {
-    if      (rs >= 2.0) score += 8;
-    else if (rs >= 1.5) score += 5;
-    else if (rs >= 1.0) score += 3;
+    if      (rs >= 3.0) score += 18;
+    else if (rs >= 2.0) score += 12;
+    else if (rs >= 1.5) score += 6;
+    else if (rs >= 1.0) score += 2;
   }
 
   // 10. Rule of 40 (0-20pt): RevenueGrowth% + FCFMargin% — 成長とキャッシュ創出の両立
@@ -100,6 +100,8 @@ export function calcScore(row) {
     else if (r40 >= 40) score += 10;
     else if (r40 >= 30) score += 5;
   }
+
+  if (r40 != null && r40 < 0) score = Math.max(0, score - 10);
 
   let result = Math.min(100, score);
 
@@ -115,8 +117,7 @@ export function calcScore(row) {
   // G. クロスファクター: mc < $10B かつ Rev YoY > 50% → 小型高成長の最低 A 保証（score ≥ 70）
   if (mc > 0 && mc < 1e10 && (rg || 0) > 50 && result < 70) result = 70;
 
-  // D. $20B超 = 10倍成長の余地なし → B以下に制限（score ≤ 69）
-  if (mc > 2e10 && mc <= 5e10) result = Math.min(69, result);
+  if (mc > 2e10 && mc <= 5e10) result = Math.min(55, result);
 
   // E. $50B超 = マルチバガー不適格 → 強制 D（score ≤ 10）
   if (mc > 5e10) return Math.min(10, result);

@@ -24,8 +24,7 @@ export function getSignals(row) {
     }
   }
 
-  // ⚠️ Overheated: >30% above 50-day MA
-  if ((row.ma50Dev || 0) > 30) {
+  if ((row.ma50Dev || 0) > 20) {
     signals.push({ type: 'overheated', icon: '⚠️', label: '過熱', color: '#9CA3AF' });
   }
 

@@ -183,13 +183,28 @@ function ScoreHeaderPopover() {
     </div>
   );
 }
-function SignalBadges({ score, signals, specialDividend, rs }) {
+function SignalBadges({ score, signals, specialDividend, rs, earningsDate, marketCap }) {
   const buy = hasBuySignal(score, signals);
+  const earningsWarning = (() => {
+    if (!earningsDate) return false;
+    const hasBreakout = signals.some(s => s.type === 'breakout');
+    if (!hasBreakout) return false;
+    const daysTo = (new Date(earningsDate) - Date.now()) / 86400000;
+    return daysTo >= 0 && daysTo <= 7;
+  })();
   return (
     <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center' }}>
       {buy && (
-        <span className="buy-pulse" style={{ fontSize: 11, padding: '3px 8px', borderRadius: 5, background: '#DCFCE7', color: '#15803D', fontWeight: 700, border: '1px solid #86EFAC', whiteSpace: 'nowrap' }}>
-          🟢 買い
+        <span className="buy-pulse"
+          title={earningsWarning ? '⚠️ 決算が7日以内です。ブレイクアウト後のエントリーは急騰急落リスクがあります。' : undefined}
+          style={{ fontSize: 11, padding: '3px 8px', borderRadius: 5, background: '#DCFCE7', color: '#15803D', fontWeight: 700, border: '1px solid #86EFAC', whiteSpace: 'nowrap' }}>
+          {earningsWarning ? '⚠️ ' : ''}🟢 買い
+        </span>
+      )}
+      {buy && (marketCap || 0) > 0 && (marketCap || 0) <= 2e9 && (
+        <span title="Micro-Cap銘柄です。必ず指値注文を使用してください。"
+          style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#FEF9C3', color: '#92400E', border: '1px solid #FDE047', fontWeight: 600, whiteSpace: 'nowrap', cursor: 'help' }}>
+          指値注文推奨
         </span>
       )}
       {rs != null && rs >= 1.5 && (
@@ -289,7 +304,7 @@ function ScanRow({ row, rank, watchlist, onWatch, usdJpy, onEnrich,
           {row.grossMargin != null ? row.grossMargin.toFixed(1) + '%' : '—'}
         </td>
         <td style={{ padding: '8px 10px' }}>
-          <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} rs={row.rs} />
+          <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} rs={row.rs} earningsDate={row.earningsDate} marketCap={row.marketCap} />
         </td>
         <td style={{ padding: '8px 10px', textAlign: 'center' }}>
           <ScoreBadge score={row.score} />
@@ -408,7 +423,7 @@ function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich,
             color={row.grossMargin != null ? (row.grossMargin >= 70 ? '#15803D' : row.grossMargin >= 50 ? '#D97706' : '#64748B') : '#CBD5E1'}
             bg={row.grossMargin != null && row.grossMargin >= 70 ? '#ECFDF5' : '#F8FAFC'} />
         </div>
-        <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} rs={row.rs} />
+        <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} rs={row.rs} earningsDate={row.earningsDate} marketCap={row.marketCap} />
         {isWatchTab && row.trendMode === 'breakout' && (
           <button onClick={() => onBuyToggle(row.ticker)}
             style={{ marginTop: 10, width: '100%', padding: '9px', borderRadius: 8, background: isBuying ? '#DCFCE7' : '#F0FDF4', color: '#15803D', border: '1px solid #86EFAC', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
@@ -706,10 +721,9 @@ export default function Page() {
 
   const capRanges = {
     all:   { min: 0,    max: Infinity },
-    micro: { min: 1e9,  max: 2e9   },  // $1B–$2B Micro-Cap（×1.2 マルチプライヤー対象）
-    small: { min: 2e9,  max: 1e10  },  // $2B–$10B Small-Cap
-    mid:   { min: 1e10, max: 5e10  },  // $10B–$50B Mid-Cap
-    large: { min: 5e10, max: 1.5e11 }, // $50B–$150B Large-Cap
+    micro: { min: 1e9,  max: 2e9     },
+    small: { min: 2e9,  max: 1e10    },
+    mid:   { min: 1e10, max: 2e10    },
   };
   const { min: capMin, max: capMax } = capRanges[capFilter] || capRanges.all;
 
@@ -1057,13 +1071,11 @@ export default function Page() {
           </span>
         )}
         <select value={capFilter} onChange={e => setCapFilter(e.target.value)}
-          style={{ display: tab === 'hidden' ? 'none' : undefined }}
-          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 13, cursor: 'pointer', minHeight: 44 }}>
-          <option value="all">規模: すべて ($1B–$150B)</option>
+          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 13, cursor: 'pointer', minHeight: 44, display: tab === 'hidden' ? 'none' : undefined }}>
+          <option value="all">規模: すべて ($1B–$20B)</option>
           <option value="micro">Micro-Cap ($1B–$2B) ×1.2 ボーナス</option>
           <option value="small">Small-Cap ($2B–$10B)</option>
-          <option value="mid">Mid-Cap ($10B–$50B)</option>
-          <option value="large">Large-Cap ($50B–$150B)</option>
+          <option value="mid">Mid-Cap ($10B–$20B)</option>
         </select>
         {sectors.length > 2 && tab !== 'hidden' && (
           <select value={sectorFilter} onChange={e => setSectorFilter(e.target.value)}
@@ -1155,7 +1167,7 @@ export default function Page() {
                 マルチバガー候補が見つかりませんでした
               </p>
               <p style={{ fontSize: 13, lineHeight: 1.7, maxWidth: 360, margin: '0 auto', color: '#94A3B8' }}>
-                時価総額 $1B〜$150B かつ 売上成長率 +15% 以上の条件を<br />
+                時価総額 $1B〜$20B かつ 売上成長率 +20% 以上の条件を<br />
                 満たす52週高値圏の銘柄が現在存在しません。<br />
                 時間をおいて再スキャンしてください。
               </p>
@@ -1294,7 +1306,7 @@ export default function Page() {
                 group: '📈 買いシグナル',
                 items: [
                   { badge: '🟢 買い',    bg: '#DCFCE7', color: '#15803D', border: '#86EFAC',    desc: 'スコア70以上・過熱なし' },
-                  { badge: '🔴 突破',    bg: '#F1F5F9', color: '#DC2626', border: '#FECACA',    desc: '高値圏×出来高1.5倍超×上昇' },
+                  { badge: '🔴 突破',    bg: '#F1F5F9', color: '#DC2626', border: '#FECACA',    desc: '高値圏×出来高2倍超×上昇。翌朝プレマーケット価格と乖離する場合があります' },
                   { badge: '🔵 押し目',  bg: '#EFF6FF', color: '#2563EB', border: '#BFDBFE',    desc: '高値圏から2〜10%の押し戻し' },
                   { badge: '📈 RS',      bg: '#EFF6FF', color: '#1D4ED8', border: '#93C5FD',    desc: 'QQQ比1.5倍超のリターン' },
                 ],
@@ -1302,7 +1314,7 @@ export default function Page() {
               {
                 group: '⚠️ 注意シグナル',
                 items: [
-                  { badge: '🟡 過熱',    bg: '#FEF9C3', color: '#A16207', border: '#FDE047',    desc: '50日線から30%超乖離・新規見送り' },
+                  { badge: '🟡 過熱',    bg: '#FEF9C3', color: '#A16207', border: '#FDE047',    desc: '50日線から20%超乖離・新規見送り' },
                   { badge: '⏳ 決算近',  bg: '#FEF3C7', color: '#D97706', border: '#FDE68A',    desc: '7日以内に決算発表・急騰急落リスク' },
                 ],
               },

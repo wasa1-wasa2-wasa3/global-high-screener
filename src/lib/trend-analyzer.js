@@ -14,7 +14,7 @@ export function getTrendMode({ price, week52High, volRatio, dayChangePct, ma50De
   const pct = week52High > 0 ? (price / week52High - 1) * 100 : null;
 
   // breakout: 52W高値到達 + 大出来高（1.5x以上）+ 上昇
-  if (pct !== null && pct >= -0.1 && vr >= 1.5 && dc > 0.5) return 'breakout';
+  if (pct !== null && pct >= -0.1 && vr >= 2.0 && dc > 1.5) return 'breakout';
 
   // exit: 大出来高での急落（出来高2x以上 + 日次-2%以下）
   // または MA50 割り込みを大出来高で確認（分配売り）

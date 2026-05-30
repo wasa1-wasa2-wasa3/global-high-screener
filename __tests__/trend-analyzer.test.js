@@ -9,14 +9,14 @@ describe('getTrendMode', () => {
     it('高値圏 / volRatio 2x / +2% → breakout', () => {
       expect(getTrendMode({ ...base, price: 100, week52High: 100, volRatio: 2.0, dayChangePct: 2 })).toBe('breakout');
     });
-    it('高値-0.1% / volRatio 1.5x / +0.6% → breakout', () => {
-      expect(getTrendMode({ ...base, price: 99.9, week52High: 100, volRatio: 1.5, dayChangePct: 0.6 })).toBe('breakout');
+    it('高値-0.1% / volRatio 1.5x / +0.6% → breakout 非適用（vr >= 2.0 が条件）', () => {
+      expect(getTrendMode({ ...base, price: 99.9, week52High: 100, volRatio: 1.5, dayChangePct: 0.6 })).not.toBe('breakout');
     });
-    it('高値圏だが出来高 1.4x → breakout 非適用', () => {
-      expect(getTrendMode({ ...base, price: 100, week52High: 100, volRatio: 1.4, dayChangePct: 2 })).not.toBe('breakout');
+    it('高値圏だが出来高 1.9x → breakout 非適用（>= 2.0x が条件）', () => {
+      expect(getTrendMode({ ...base, price: 100, week52High: 100, volRatio: 1.9, dayChangePct: 2 })).not.toBe('breakout');
     });
-    it('高値圏・大出来高だが日次 +0.4% → breakout 非適用（> 0.5% が条件）', () => {
-      expect(getTrendMode({ ...base, price: 100, week52High: 100, volRatio: 2.0, dayChangePct: 0.4 })).not.toBe('breakout');
+    it('高値圏・大出来高だが日次 +1.4% → breakout 非適用（> 1.5% が条件）', () => {
+      expect(getTrendMode({ ...base, price: 100, week52High: 100, volRatio: 2.0, dayChangePct: 1.4 })).not.toBe('breakout');
     });
     it('高値から-0.2% → breakout 非適用（pct < -0.1 が条件）', () => {
       expect(getTrendMode({ ...base, price: 99.8, week52High: 100, volRatio: 2.0, dayChangePct: 2 })).not.toBe('breakout');

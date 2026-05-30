@@ -6,10 +6,10 @@ import { Resend } from 'resend';
 const UA        = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)';
 const BATCH     = 50;
 const CONCURRENT = 6;
-const THRESHOLD  = 0.90;
+const THRESHOLD  = 0.85;
 const MIN_CAP          = 1_000_000_000;  // $1B  — 下限
-const MAX_CAP          = 150_000_000_000; // $150B — Large-Cap 上限
-const MIN_REV_YOY      = 15;   // Rev YoY +15% 未満は除外
+const MAX_CAP          = 20_000_000_000; // $20B — 上限
+const MIN_REV_YOY      = 20;   // Rev YoY +20% 未満は除外
 const MAX_PSR          = 25;   // PSR 25倍超 = 投機バブル、除外
 const MIN_VOL_AVG      = 200_000; // 日平均20万株未満 = 流動性不足、除外
 const MIN_GROSS_MARGIN = 40;   // グロス利益率40%未満 = 低品質ビジネス、除外
@@ -137,8 +137,11 @@ async function fetchChartOhlc(ticker) {
     const result = data?.chart?.result?.[0];
     if (!result?.indicators?.quote?.[0]) return null;
     const { open, high, low, close } = result.indicators.quote[0];
-    return open.map((o, i) => ({ open: o, high: high[i], low: low[i], close: close[i] }))
-      .filter(r => r.open != null && r.high != null && r.low != null && r.close != null);
+    const timestamps = result.timestamp || [];
+    return open.map((o, i) => ({
+      open: o, high: high[i], low: low[i], close: close[i],
+      ts: timestamps[i] ? timestamps[i] * 1000 : null,
+    })).filter(r => r.open != null && r.high != null && r.low != null && r.close != null);
   } catch {
     clearTimeout(timer);
     return null;
@@ -360,11 +363,11 @@ export async function POST() {
       return row;
     });
 
-    // フィルタ② (ハード): Rev YoY < 15% 除外 + Gross Margin < 40% 除外
     const rows = enriched
       .filter(row =>
         (row.revenueGrowthYoy == null || row.revenueGrowthYoy >= MIN_REV_YOY) &&
-        (row.grossMargin      == null || row.grossMargin      >= MIN_GROSS_MARGIN)
+        (row.grossMargin      == null || row.grossMargin      >= MIN_GROSS_MARGIN) &&
+        row.score >= 50
       )
       .sort((a, b) => b.score - a.score)
       .slice(0, 25);
@@ -382,12 +385,20 @@ export async function POST() {
     rows.forEach((row, i) => {
       const ohlc = stockCharts[i];
       row.islandReversal = isIslandReversal(ohlc);
-      if (ohlc && ohlc.length >= 2 && qqqFactor != null && qqqFactor > 0) {
-        const stockFactor = ohlc.at(-1).close / ohlc[0].close;
-        row.rs = Math.round((stockFactor / qqqFactor) * 100) / 100;
+      if (ohlc && ohlc.length >= 2) {
+        if (qqqFactor != null && qqqFactor > 0) {
+          const stockFactor = ohlc.at(-1).close / ohlc[0].close;
+          row.rs = Math.round((stockFactor / qqqFactor) * 100) / 100;
+        }
+        const nearHighThreshold = row.week52High * 0.98;
+        for (let j = ohlc.length - 1; j >= 0; j--) {
+          if (ohlc[j].high >= nearHighThreshold && ohlc[j].ts != null) {
+            row.lastNearHighAt = ohlc[j].ts;
+            break;
+          }
+        }
       }
       row.score = calcScore(row);
-      if (row.islandReversal) row.score = Math.min(100, row.score + 5);
     });
     rows.sort((a, b) => b.score - a.score);
     const capped = applySectorCap(rows);

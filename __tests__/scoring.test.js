@@ -248,8 +248,8 @@ describe('Rev YoY > 50% → 最低ランク B (score ≥ 63)', () => {
 
 // ─── $20B超 → B以下に制限 ────────────────────────────────────────────────────
 
-describe('$20B超 → score ≤ 69 (B以下)', () => {
-  it('$20.1B / 全指標最大 → Bキャップ (score = 69)', () => {
+describe('$20B超 → score ≤ 55 (C以下)', () => {
+  it('$20.1B / 全指標最大 → Cキャップ (score = 55)', () => {
     const score = calcScore({
       marketCap: 2.01e10,
       revenueGrowthYoy: 100, grossMargin: 90,
@@ -257,10 +257,10 @@ describe('$20B超 → score ≤ 69 (B以下)', () => {
       volume: 5000000, volAvg: 1000000,
       dayChangePct: 10, psr: 1,
     });
-    expect(score).toBe(69);
-    expect(scoreRankLabel(score)).toBe('B');
+    expect(score).toBe(55);
+    expect(scoreRankLabel(score)).toBe('C');
   });
-  it('$20B ちょうど → Bキャップ対象外（> 20B が条件）', () => {
+  it('$20B ちょうど → キャップ対象外（> 20B が条件）', () => {
     const score = calcScore({
       marketCap: 2e10,
       revenueGrowthYoy: 100, grossMargin: 90,
@@ -342,16 +342,14 @@ describe('品質アンカー: Rev YoY ≥ 20% かつ GM ≥ 70% → score ≥ 63
     expect(score).toBeLessThan(63);
   });
 
-  it('Rev 25% / GM 72% / $25B → $20B超キャップ後も B 維持（69 ≥ 63）', () => {
-    // アンカー → 63 → $20B超キャップ min(69, 63) = 63 → B
+  it('Rev 25% / GM 72% / $25B → $20B超キャップで C（55pt）', () => {
     const score = calcScore({
       revenueGrowthYoy: 25,
       marketCap: 2.5e10,
       grossMargin: 72,
     });
-    expect(score).toBeGreaterThanOrEqual(63);
-    expect(score).toBeLessThanOrEqual(69);
-    expect(scoreRankLabel(score)).toBe('B');
+    expect(score).toBeLessThanOrEqual(55);
+    expect(scoreRankLabel(score)).toBe('C');
   });
 
   it('Rev 25% / GM 72% / $60B → $50B超キャップで D（アンカー無効）', () => {
@@ -420,5 +418,15 @@ describe('出来高急増 (0-5pt) / 前日モメンタム (0-2pt) — ノイズ�
     const base = calcScore({});
     const withBoth = calcScore({ volume: 4000000, volAvg: 1000000, dayChangePct: 10 });
     expect(withBoth - base).toBe(7);
+  });
+});
+
+// ─── Rule of 40 負値ペナルティ ───────────────────────────────────────────────
+
+describe('Rule of 40 負値 → 10pt 減点', () => {
+  it('Rule of 40 が負値 → 10pt 減点', () => {
+    const base = calcScore({ revenueGrowthYoy: 20 });
+    const withNeg = calcScore({ revenueGrowthYoy: 20, ruleOf40: -10 });
+    expect(withNeg).toBe(Math.max(0, base - 10));
   });
 });
