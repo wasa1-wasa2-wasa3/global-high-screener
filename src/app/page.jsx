@@ -775,16 +775,24 @@ export default function Page() {
         th.sortable-th { transition: background 0.15s, color 0.15s; cursor: pointer; user-select: none; }
         th.sortable-th:hover { background: #1a3a6a !important; color: #F0C040 !important; }
       `}</style>
-      {/* Nav */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', rowGap: 8 }}>
-        <nav style={{ display: 'flex', gap: 4, background: '#EEF2FF', padding: 4, borderRadius: 10 }}>
-          <a href="/guide"     style={navStyle(false)}>📖 ガイド</a>
-          <a href="/"          style={navStyle(true)} >📈 USスキャン</a>
-          <a href="/portfolio" style={navStyle(false)}>📊 ポートフォリオ</a>
-          <a href="https://new-high-screener.vercel.app" target="_blank" rel="noopener noreferrer"
-            style={{ fontSize: 12, padding: '5px 11px', borderRadius: 6, textDecoration: 'none', background: 'rgba(0,0,0,0.06)', color: '#64748B', fontWeight: 600, whiteSpace: 'nowrap', marginLeft: 4 }}>🗾 日本株 ↗</a>
+      <div style={{ position: 'sticky', top: 0, zIndex: 100, background: '#0F172A', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', gap: 8, marginBottom: '1.5rem', marginLeft: '-1rem', marginRight: '-1rem', width: 'calc(100% + 2rem)' }}>
+        <span style={{ fontSize: 15, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>🇺🇸 ドルドルくん</span>
+        <nav style={{ display: 'flex', gap: 2, overflowX: 'auto', flexShrink: 1, minWidth: 0 }}>
+          {[
+            { href: '/',          label: 'USスキャン',     active: true  },
+            { href: '/portfolio', label: 'PF',             active: false },
+            { href: '/guide',     label: 'ガイド',         active: false },
+          ].map(({ href, label, active }) => (
+            <a key={href} href={href} style={{ fontSize: 12, padding: '5px 10px', borderRadius: 6, textDecoration: 'none', whiteSpace: 'nowrap', background: active ? 'rgba(255,255,255,0.12)' : 'transparent', color: active ? '#fff' : '#94A3B8', fontWeight: active ? 600 : 400 }}>{label}</a>
+          ))}
+          <a href="https://new-high-screener.vercel.app" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, padding: '4px 8px', borderRadius: 5, textDecoration: 'none', background: '#1D4ED8', color: '#fff', fontWeight: 600, whiteSpace: 'nowrap', marginLeft: 4 }}>🗾 JP ↗</a>
         </nav>
-        <AuthButton />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          <button onClick={runScan} disabled={loading} style={{ fontSize: 12, padding: '6px 14px', minHeight: 36, background: loading ? '#555' : '#4F46E5', color: '#fff', border: 'none', borderRadius: 7, cursor: loading ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
+            {loading ? '⏳ スキャン中...' : '🔍 スキャン'}
+          </button>
+          <AuthButton />
+        </div>
       </div>
 
       {/* Pipeline alert banner */}
