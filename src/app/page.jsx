@@ -714,6 +714,17 @@ export default function Page() {
         const now = new Date().toISOString();
         setWatchRefreshedAt(now);
         localStorage.setItem(WATCH_REFRESH_KEY, now);
+
+        const newBreakouts = Object.values(next).filter(r => r.trendMode === 'breakout');
+        if (newBreakouts.length > 0) {
+          const entries = newBreakouts.map(r => ({ ...r, detectedAt: now }));
+          setBreakoutHistory(prev => {
+            const existing = prev.filter(p => !(entries.some(e => e.ticker === p.ticker && e.detectedAt === p.detectedAt)));
+            const merged = [...entries, ...existing].slice(0, BREAKOUT_HIST_MAX);
+            try { localStorage.setItem(BREAKOUT_HIST_KEY, JSON.stringify(merged)); } catch {}
+            return merged;
+          });
+        }
       }
     } catch {}
     setWatchRefreshing(false);
@@ -1138,6 +1149,35 @@ export default function Page() {
       {tab === 'watchlist' && watchRows.length > 0 && watchRefreshedAt && Date.now() - new Date(watchRefreshedAt) > WATCH_STALE_MS && (
         <div style={{ marginBottom: 12, padding: '10px 14px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, fontSize: 12, color: '#92400E', display: 'flex', alignItems: 'center', gap: 8 }}>
           ⚠️ データが1時間以上古くなっています。「価格を更新」ボタンを押してください。
+        </div>
+      )}
+
+      {/* エントリーバナー（ウォッチリストタブ内） */}
+      {tab === 'watchlist' && pipelineAlerts.length > 0 && (
+        <div style={{ marginBottom: 14, padding: '14px 18px', borderRadius: 14, background: 'linear-gradient(135deg, #052e16 0%, #14532d 100%)', border: '2px solid #16A34A', animation: 'alertPulse 2s ease-in-out infinite' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <span style={{ fontSize: 22 }}>🚀</span>
+            <span style={{ fontSize: 16, fontWeight: 800, color: '#4ADE80' }}>
+              今すぐエントリー検討！ {pipelineAlerts.length}銘柄がブレイクアウト
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+            {pipelineAlerts.map(r => (
+              <div key={r.ticker} style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 12px', border: '1px solid #16A34A' }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#4ADE80' }}>{r.ticker}</div>
+                <div style={{ fontSize: 11, color: '#86EFAC', marginBottom: 3 }}>{r.name}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{fmtPrice(r.regularMarketPrice ?? r.price)}</div>
+                {r.dayChangePct != null && (
+                  <div style={{ fontSize: 11, color: r.dayChangePct >= 0 ? '#4ADE80' : '#F87171', fontWeight: 700 }}>
+                    {r.dayChangePct >= 0 ? '+' : ''}{r.dayChangePct.toFixed(2)}%
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: '#86EFAC' }}>
+            ⚠️ 購入後は必ず逆指値注文を入れること（目安: -10%）
+          </div>
         </div>
       )}
 
