@@ -423,10 +423,23 @@ describe('出来高急増 (0-5pt) / 前日モメンタム (0-2pt) — ノイズ�
 
 // ─── Rule of 40 負値ペナルティ ───────────────────────────────────────────────
 
-describe('Rule of 40 負値 → 10pt 減点', () => {
-  it('Rule of 40 が負値 → 10pt 減点', () => {
+describe('Rule of 40 負値 → 5pt 減点', () => {
+  it('Rule of 40 が負値 → 5pt 減点', () => {
     const base = calcScore({ revenueGrowthYoy: 20 });
     const withNeg = calcScore({ revenueGrowthYoy: 20, ruleOf40: -10 });
-    expect(withNeg).toBe(Math.max(0, base - 10));
+    expect(withNeg).toBe(Math.max(0, base - 5));
+  });
+});
+
+// ─── earningsGrowth / gapUpPct は加点なし（削除済み） ────────────────────────
+
+describe('earningsGrowth / gapUpPct — 加点なし', () => {
+  it('earningsGrowth があっても加点されない', () => {
+    const base = calcScore({ revenueGrowthYoy: 25 });
+    expect(calcScore({ revenueGrowthYoy: 25, earningsGrowth: 30 })).toBe(base);
+  });
+  it('gapUpPct があっても加点されない', () => {
+    const base = calcScore({});
+    expect(calcScore({ gapUpPct: 5.1 })).toBe(base);
   });
 });

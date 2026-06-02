@@ -54,6 +54,7 @@ async function fetchScreenerPage(offset, crumb, cookie) {
       operator: 'AND',
       operands: [
         { operator: 'gt', operands: ['intradaymarketcap', MIN_CAP] },
+        { operator: 'lt', operands: ['intradaymarketcap', MAX_CAP] },
         { operator: 'or', operands: [
           { operator: 'EQ', operands: ['exchange', 'NMS'] },
           { operator: 'EQ', operands: ['exchange', 'NYQ'] },
@@ -217,6 +218,9 @@ function mapQuote(q, meta) {
     volAvg,
     volRatio,
     dayChangePct: Math.round((q.regularMarketChangePercent || 0) * 100) / 100,
+    gapUpPct: (q.regularMarketOpen > 0 && q.regularMarketPreviousClose > 0)
+      ? Math.round((q.regularMarketOpen / q.regularMarketPreviousClose - 1) * 1000) / 10
+      : 0,
     marketCap:    q.marketCap || 0,
     pe:           q.trailingPE || null,
     pbr:          q.priceToBook > 0 ? Math.round(q.priceToBook * 100) / 100 : null,
@@ -279,7 +283,10 @@ async function fetchOneFundamentals(ticker, crumb, cookie) {
     const ruleOf40 = revenueGrowthYoy != null && fcfMargin != null
       ? Math.round(revenueGrowthYoy + fcfMargin) : null;
 
-    return { ticker, revenueGrowthYoy, grossMargin, revCAGR3Y, fcfMargin, ruleOf40 };
+    const earningsGrowth = fd.earningsGrowth?.raw != null
+      ? Math.round(fd.earningsGrowth.raw * 1000) / 10 : null;
+
+    return { ticker, revenueGrowthYoy, grossMargin, revCAGR3Y, fcfMargin, ruleOf40, earningsGrowth };
   } catch {
     clearTimeout(timer);
     return { ticker };
@@ -358,6 +365,7 @@ export async function POST() {
         if (f.revCAGR3Y        != null) row.revCAGR3Y        = f.revCAGR3Y;
         if (f.fcfMargin        != null) row.fcfMargin        = f.fcfMargin;
         if (f.ruleOf40         != null) row.ruleOf40         = f.ruleOf40;
+        if (f.earningsGrowth   != null) row.earningsGrowth   = f.earningsGrowth;
         row.score = calcScore(row);
       }
       return row;
@@ -367,6 +375,7 @@ export async function POST() {
       .filter(row =>
         (row.revenueGrowthYoy == null || row.revenueGrowthYoy >= MIN_REV_YOY) &&
         (row.grossMargin      == null || row.grossMargin      >= MIN_GROSS_MARGIN) &&
+        !(row.ruleOf40 != null && row.ruleOf40 < 0) &&
         row.score >= 50
       )
       .sort((a, b) => b.score - a.score)
@@ -415,6 +424,20 @@ export async function POST() {
         to:   process.env.NOTIFY_EMAIL,
         subject: `🚀 ブレイクアウト検出 (${breakouts.length}件) — ${breakouts.map(r => r.ticker).join(', ')}`,
         text: `US 52週高値スキャナー — ブレイクアウト通知\n\n${lines}\n\nhttps://global-high-screener.vercel.app`,
+      }).catch(() => {});
+    }
+
+    const exits = capped.filter(r => r.trendMode === 'exit');
+    if (exits.length > 0 && process.env.RESEND_API_KEY && process.env.NOTIFY_EMAIL) {
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      const lines = exits.map(r =>
+        `⚠️ ${r.ticker}  ${r.name || ''}\n   $${r.price?.toFixed(2)}  ${r.dayChangePct?.toFixed(1)}%  出来高 ${r.volRatio?.toFixed(1)}x  MA50乖離 ${r.ma50Dev?.toFixed(1)}%`
+      ).join('\n\n');
+      resend.emails.send({
+        from: 'US Screener <onboarding@resend.dev>',
+        to:   process.env.NOTIFY_EMAIL,
+        subject: `⚠️ 売り検討 (${exits.length}件) — ${exits.map(r => r.ticker).join(', ')}`,
+        text: `US 52週高値スキャナー — 売り検討通知\n\n${lines}\n\nhttps://global-high-screener.vercel.app`,
       }).catch(() => {});
     }
 

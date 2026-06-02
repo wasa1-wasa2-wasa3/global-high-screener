@@ -4,20 +4,21 @@
  * 加点ブラケット（Phase 3 でスキャン時に全データ取得済み）:
  *   1. 売上成長率 YoY      0-45pt  最優先
  *   2. 小型株プレミアム    0-25pt  $10B以下に傾斜
- *   3. グロス利益率        0-20pt  ← 15pt から増量（高収益企業の安定評価）
+ *   3. グロス利益率        0-20pt
  *   4. 52週高値近接        0-10pt
  *   5. PSR                 0-10pt
- *   6. 出来高急増          0-5pt   ← 8pt から削減（ノイズ抑制）
- *   7. 前日モメンタム      0-2pt   ← 4pt から削減（ノイズ抑制）
- *   8. 成長効率ボーナス    0-8pt  Rev≥30% かつ PSR<15（成長×割安）
- *   9. RS vs QQQ           0-8pt  1年相対強度（2x以上で満点）
+ *   6. 出来高急増          0-5pt
+ *   7. 前日モメンタム      0-2pt
+ *   8. 成長効率ボーナス    0-8pt   Rev≥30% かつ PSR<15（成長×割安）
+ *   9. RS vs QQQ           0-8pt   1年相対強度
+ *  10. Rule of 40          0-10pt  RevGrowth% + FCFMargin%（-5pt ペナルティあり）
  *
  * ポスト補正（加点後に適用）:
- *   A. ≤$2B 超小型マルチプライヤー × 1.2
+ *   A. ≤$2B 超小型マルチプライヤー × 1.2（Math.min(100,…) 前に適用）
  *   B. Rev YoY > 50% → 最低ランク B 保証（score ≥ 63）
  *   C. 品質アンカー: Rev≥20% かつ GM≥70% → 最低ランク B 保証（score ≥ 63）
  *   G. クロスファクター: mc < $10B かつ Rev YoY > 50% → 最低ランク A 保証（score ≥ 70）
- *   D. $20B超 → B以下に制限（score ≤ 69）
+ *   D. $20B超 → B以下に制限（score ≤ 55）
  *   E. $50B超 → 強制 D（score ≤ 10）
  */
 export function calcScore(row) {
@@ -84,29 +85,29 @@ export function calcScore(row) {
   // 8. 成長効率ボーナス (0-8pt): Rev YoY ≥ 30% かつ PSR < 15 = 成長に対して割安
   if ((rg || 0) >= 30 && psr != null && psr > 0 && psr < 15) score += 8;
 
+  // 9. RS vs QQQ (0-8pt) — 1年相対強度
   const rs = row.rs;
   if (rs != null) {
-    if      (rs >= 3.0) score += 18;
-    else if (rs >= 2.0) score += 12;
-    else if (rs >= 1.5) score += 6;
-    else if (rs >= 1.0) score += 2;
+    if      (rs >= 3.0) score += 8;
+    else if (rs >= 2.0) score += 5;
+    else if (rs >= 1.5) score += 3;
+    else if (rs >= 1.0) score += 1;
   }
 
-  // 10. Rule of 40 (0-20pt): RevenueGrowth% + FCFMargin% — 成長とキャッシュ創出の両立
+  // 10. Rule of 40 (0-10pt): RevGrowth% + FCFMargin% — 成長とキャッシュ創出の両立
   const r40 = row.ruleOf40;
   if (r40 != null) {
-    if      (r40 >= 60) score += 20;
-    else if (r40 >= 50) score += 15;
-    else if (r40 >= 40) score += 10;
-    else if (r40 >= 30) score += 5;
+    if      (r40 >= 60) score += 10;
+    else if (r40 >= 50) score += 7;
+    else if (r40 >= 40) score += 5;
+    else if (r40 >= 30) score += 2;
+    else if (r40 < 0)   score = Math.max(0, score - 5);
   }
 
-  if (r40 != null && r40 < 0) score = Math.max(0, score - 10);
+  // A. ≤$2B 超小型マルチプライヤー × 1.2（Math.min 前に適用して差別化を維持）
+  if (mc > 0 && mc <= 2e9) score = Math.round(score * 1.2);
 
   let result = Math.min(100, score);
-
-  // A. ≤$2B 超小型マルチプライヤー × 1.2（10倍成長の余地が最も大きいため）
-  if (mc > 0 && mc <= 2e9) result = Math.min(100, Math.round(result * 1.2));
 
   // B. Rev YoY > 50% = 成長最優先 → 最低 B ランク保証（score ≥ 63、3pt マージン付き）
   if ((rg || 0) > 50 && result < 63) result = 63;
@@ -117,6 +118,7 @@ export function calcScore(row) {
   // G. クロスファクター: mc < $10B かつ Rev YoY > 50% → 小型高成長の最低 A 保証（score ≥ 70）
   if (mc > 0 && mc < 1e10 && (rg || 0) > 50 && result < 70) result = 70;
 
+  // D. $20B超 → B以下に制限（マルチバガー余地が限定的）
   if (mc > 2e10 && mc <= 5e10) result = Math.min(55, result);
 
   // E. $50B超 = マルチバガー不適格 → 強制 D（score ≤ 10）
