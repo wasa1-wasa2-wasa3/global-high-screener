@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import AuthButton from '../components/AuthButton';
 import NavBar from '../components/NavBar';
@@ -1291,15 +1291,17 @@ export default function Page() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: NAVY, color: '#fff' }}>
-                    {['検出日時', 'ティッカー', '価格 (USD)', 'JPY換算', '前日比', '出来高比', '時価総額', 'Rev YoY', 'Gross Mg', 'スコア'].map(h => (
+                    {['検出日時', 'ティッカー', '価格 (USD)', 'JPY換算', '前日比', '出来高比', '時価総額', 'Rev YoY', 'Gross Mg', 'スコア', ''].map(h => (
                       <th key={h} style={{ padding: '10px 10px', textAlign: 'left', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {breakoutHistory.map((r, i) => (
-                    <tr key={`${r.ticker}-${r.detectedAt}-${i}`}
-                      style={{ background: i % 2 === 0 ? '#fff' : '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
+                  {breakoutHistory.map((r, i) => {
+                    const isBuying = buyingTicker === `hist-${r.ticker}-${r.detectedAt}`;
+                    return (
+                    <React.Fragment key={`${r.ticker}-${r.detectedAt}-${i}`}>
+                    <tr style={{ background: isBuying ? '#F0FDF4' : i % 2 === 0 ? '#fff' : '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
                       <td style={{ padding: '10px', whiteSpace: 'nowrap', fontSize: 11, color: '#64748B' }}>
                         {new Date(r.detectedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </td>
@@ -1327,8 +1329,45 @@ export default function Page() {
                           </span>
                         ) : '—'}
                       </td>
+                      <td style={{ padding: '10px', whiteSpace: 'nowrap' }}>
+                        <button onClick={() => handleBuyToggle(`hist-${r.ticker}-${r.detectedAt}`)}
+                          style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, background: isBuying ? '#DCFCE7' : '#F0FDF4', color: '#15803D', border: '1px solid #86EFAC', cursor: 'pointer', fontWeight: 600 }}>
+                          ✅ 購入した
+                        </button>
+                      </td>
                     </tr>
-                  ))}
+                    {isBuying && (
+                      <tr style={{ background: '#F0FDF4' }}>
+                        <td colSpan={11} style={{ padding: '10px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#15803D' }}>📥 {r.ticker} をポートフォリオに追加</span>
+                            <label style={{ fontSize: 12, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
+                              平均取得単価 (USD):
+                              <input type="number" value={buyForm.avgCost} onChange={e => setBuyForm(p => ({ ...p, avgCost: e.target.value }))}
+                                placeholder={r.price?.toFixed(2)}
+                                style={{ width: 90, padding: '4px 8px', borderRadius: 6, border: '1px solid #86EFAC', fontSize: 13 }} />
+                            </label>
+                            <label style={{ fontSize: 12, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
+                              株数:
+                              <input type="number" value={buyForm.shares} onChange={e => setBuyForm(p => ({ ...p, shares: e.target.value }))}
+                                placeholder="10"
+                                style={{ width: 70, padding: '4px 8px', borderRadius: 6, border: '1px solid #86EFAC', fontSize: 13 }} />
+                            </label>
+                            <button onClick={() => addToPortfolio(r, buyForm.avgCost, buyForm.shares)}
+                              disabled={!buyForm.avgCost || !buyForm.shares}
+                              style={{ padding: '5px 16px', borderRadius: 7, background: buyForm.avgCost && buyForm.shares ? '#15803D' : '#94A3B8', color: '#fff', border: 'none', fontWeight: 700, fontSize: 13, cursor: buyForm.avgCost && buyForm.shares ? 'pointer' : 'not-allowed' }}>
+                              📊 ポートフォリオへ
+                            </button>
+                            <button onClick={() => handleBuyToggle(null)}
+                              style={{ padding: '5px 12px', borderRadius: 7, background: '#fff', color: '#64748B', border: '1px solid #E2E8F0', fontSize: 12, cursor: 'pointer' }}>
+                              キャンセル
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
+                  )})}
                 </tbody>
               </table>
             </div>
