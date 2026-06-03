@@ -1241,7 +1241,7 @@ export default function Page() {
         {[
           ['scan',      `📈 Momentum${filteredRows.length > 0 ? ` (${filteredRows.length})` : ''}`],
           ['hidden',    `🔵 Hidden${hiddenResults.length > 0 ? ` (${hiddenResults.length})` : ''}`],
-          ['watchlist', `⭐ ウォッチリスト${watchRows.length > 0 ? ` (${watchRows.length})` : ''}`],
+          ['watchlist', watchRows.length > 0 ? `⭐ ウォッチリスト — 今すぐ買い: ${pipelineAlerts.length}` : '⭐ ウォッチリスト'],
           ['history',   `📬 通知履歴${breakoutHistory.length > 0 ? ` (${breakoutHistory.length})` : ''}`],
         ].map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
@@ -1280,7 +1280,18 @@ export default function Page() {
         </div>
       )}
 
-      {/* エントリーバナー（ウォッチリストタブ内） */}
+      {/* 待機バナー（ブレイクアウト銘柄なし） */}
+      {tab === 'watchlist' && watchRows.length > 0 && pipelineAlerts.length === 0 && (
+        <div style={{ marginBottom: 14, padding: '12px 16px', borderRadius: 12, background: '#F1F5F9', border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 20 }}>⏸</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>今はエントリー可能な銘柄がありません</div>
+            <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>全{watchRows.length}銘柄がブレイク待ちです。ブレイクアウトが来るまで何もしなくてOKです。</div>
+          </div>
+        </div>
+      )}
+
+      {/* エントリーバナー（ブレイクアウト銘柄あり） */}
       {tab === 'watchlist' && pipelineAlerts.length > 0 && (
         <div style={{ marginBottom: 14, padding: '14px 18px', borderRadius: 14, background: 'linear-gradient(135deg, #052e16 0%, #14532d 100%)', border: '2px solid #16A34A', animation: 'alertPulse 2s ease-in-out infinite' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
