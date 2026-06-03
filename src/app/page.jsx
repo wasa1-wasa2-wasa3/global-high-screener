@@ -1106,6 +1106,58 @@ export default function Page() {
         </div>
       </div>
 
+      {/* 今すべきことパネル */}
+      {tab === 'scan' && (() => {
+        const hasWatch    = Object.keys(watchlist).length > 0;
+        const hasBreakout = pipelineAlerts.length > 0;
+        const step        = hasBreakout ? 3 : hasWatch ? 2 : 1;
+        const marketOk    = qqqClose !== null && !bearMarket;
+        const marketUnknown = qqqClose === null;
+
+        const steps = [
+          { n: 1, icon: '🔍', label: 'スキャンして ★ でウォッチ',         sub: 'スコアS/Aの銘柄をウォッチリストに追加' },
+          { n: 2, icon: '⏸',  label: 'ブレイクアウトを待つ',              sub: 'ウォッチ銘柄のランプが「今すぐエントリー」になるまで待機' },
+          { n: 3, icon: '✅', label: '購入 → その日のうちに逆指値を発注',  sub: 'バナーの「✅ 購入する」→ ポートフォリオへ登録後、証券会社で逆指値を入れる' },
+        ];
+
+        return (
+          <div style={{ marginBottom: 16, borderRadius: 14, border: `2px solid ${bearMarket ? '#DC2626' : marketUnknown ? '#334155' : '#16A34A'}`, background: bearMarket ? '#1C0A0A' : '#0F172A', padding: '14px 16px' }}>
+            {/* 市場状態 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <span style={{ fontSize: 13, color: '#94A3B8', fontWeight: 600 }}>市場</span>
+              {marketUnknown
+                ? <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: '#1E293B', color: '#94A3B8', fontWeight: 700 }}>スキャンして確認</span>
+                : bearMarket
+                  ? <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: '#DC2626', color: '#fff', fontWeight: 700 }}>⚠️ 弱気相場 — 新規エントリー停止</span>
+                  : <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: '#16A34A', color: '#fff', fontWeight: 700 }}>✅ 買いOK（QQQ &gt; MA200）</span>
+              }
+              {!marketUnknown && (
+                <span style={{ fontSize: 11, color: '#64748B', marginLeft: 4 }}>QQQ ${qqqClose?.toFixed(2)} / MA200 ${qqqMa200?.toFixed(2)}</span>
+              )}
+            </div>
+            {/* ステップ */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {steps.map(({ n, icon, label, sub }) => {
+                const isActive  = step === n && !bearMarket;
+                const isDone    = step > n && !bearMarket;
+                const isBlocked = bearMarket;
+                return (
+                  <div key={n} style={{ flex: 1, minWidth: 180, borderRadius: 10, padding: '10px 12px', border: `1px solid ${isActive ? '#F0C040' : isDone ? '#334155' : '#1E293B'}`, background: isActive ? 'rgba(240,192,64,0.08)' : 'transparent', opacity: isBlocked ? 0.4 : isDone ? 0.5 : 1, transition: 'all 0.2s' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <span style={{ fontSize: 16 }}>{isDone ? '✓' : icon}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: isActive ? GOLD : '#64748B' }}>STEP {n}</span>
+                      {isActive && <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 10, background: GOLD, color: NAVY, fontWeight: 800, marginLeft: 'auto' }}>今ここ</span>}
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: isActive ? '#fff' : '#94A3B8', marginBottom: 3 }}>{label}</div>
+                    <div style={{ fontSize: 10, color: '#64748B', lineHeight: 1.5 }}>{sub}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Controls */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
         {tab !== 'hidden' ? (
