@@ -832,6 +832,11 @@ export default function Page() {
           <a href="https://new-high-screener.vercel.app" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, padding: '4px 8px', borderRadius: 5, textDecoration: 'none', background: '#1D4ED8', color: '#fff', fontWeight: 600, whiteSpace: 'nowrap', marginLeft: 4 }}>🗾 JP ↗</a>
         </nav>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          {qqqClose !== null && (
+            <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 20, whiteSpace: 'nowrap', background: bearMarket ? '#DC2626' : '#16A34A', color: '#fff' }}>
+              {bearMarket ? '弱気相場 ●' : '買いOK ●'}
+            </span>
+          )}
           <button onClick={runScan} disabled={loading} style={{ fontSize: 12, padding: '6px 14px', minHeight: 36, background: loading ? '#555' : '#4F46E5', color: '#fff', border: 'none', borderRadius: 7, cursor: loading ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
             {loading ? '⏳ スキャン中...' : '🔍 スキャン'}
           </button>
@@ -1201,21 +1206,56 @@ export default function Page() {
             </span>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-            {pipelineAlerts.map(r => (
-              <div key={r.ticker} style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 12px', border: '1px solid #16A34A' }}>
-                <div style={{ fontSize: 14, fontWeight: 800, color: '#4ADE80' }}>{r.ticker}</div>
-                <div style={{ fontSize: 11, color: '#86EFAC', marginBottom: 3 }}>{r.name}</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{fmtPrice(r.regularMarketPrice ?? r.price)}</div>
-                {r.dayChangePct != null && (
-                  <div style={{ fontSize: 11, color: r.dayChangePct >= 0 ? '#4ADE80' : '#F87171', fontWeight: 700 }}>
-                    {r.dayChangePct >= 0 ? '+' : ''}{r.dayChangePct.toFixed(2)}%
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-          <div style={{ fontSize: 11, color: '#86EFAC' }}>
-            ⚠️ 購入後は必ず逆指値注文を入れること（目安: -10%）
+            {pipelineAlerts.map(r => {
+              const isBuying = buyingTicker === r.ticker;
+              const stopPrice = r.atr14Pct != null && r.price
+                ? Math.max(r.price * (1 - 2.5 * r.atr14Pct / 100), r.ma50 || 0)
+                : r.price ? r.price * 0.85 : null;
+              return (
+                <div key={r.ticker} style={{ background: isBuying ? 'rgba(220,252,231,0.12)' : 'rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 12px', border: `1px solid ${isBuying ? '#4ADE80' : '#16A34A'}`, minWidth: 160 }}>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#4ADE80' }}>{r.ticker}</div>
+                  <div style={{ fontSize: 11, color: '#86EFAC', marginBottom: 3 }}>{r.name}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{fmtPrice(r.regularMarketPrice ?? r.price)}</div>
+                  {r.dayChangePct != null && (
+                    <div style={{ fontSize: 11, color: r.dayChangePct >= 0 ? '#4ADE80' : '#F87171', fontWeight: 700, marginBottom: 6 }}>
+                      {r.dayChangePct >= 0 ? '+' : ''}{r.dayChangePct.toFixed(2)}%
+                    </div>
+                  )}
+                  <button onClick={() => handleBuyToggle(r.ticker)}
+                    style={{ width: '100%', padding: '6px 0', background: isBuying ? 'rgba(220,252,231,0.2)' : '#15803D', color: '#fff', border: isBuying ? '1px solid #4ADE80' : 'none', borderRadius: 6, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                    {isBuying ? '▲ 閉じる' : '✅ 購入する →'}
+                  </button>
+                  {isBuying && (
+                    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <label style={{ fontSize: 11, color: '#86EFAC', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        取得単価 (USD)
+                        <input type="number" value={buyForm.avgCost}
+                          onChange={e => setBuyForm(p => ({ ...p, avgCost: e.target.value }))}
+                          placeholder={r.price?.toFixed(2)}
+                          style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid #16A34A', fontSize: 13, background: '#0a1f0a', color: '#fff', width: '100%', boxSizing: 'border-box' }} />
+                      </label>
+                      <label style={{ fontSize: 11, color: '#86EFAC', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        株数
+                        <input type="number" value={buyForm.shares}
+                          onChange={e => setBuyForm(p => ({ ...p, shares: e.target.value }))}
+                          placeholder="10"
+                          style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid #16A34A', fontSize: 13, background: '#0a1f0a', color: '#fff', width: '100%', boxSizing: 'border-box' }} />
+                      </label>
+                      {stopPrice != null && (
+                        <div style={{ fontSize: 10, color: '#86EFAC', background: 'rgba(0,0,0,0.3)', borderRadius: 5, padding: '4px 6px' }}>
+                          推奨逆指値: {fmtPrice(stopPrice)} ({r.atr14Pct != null ? `2.5×ATR` : '-15%'})
+                        </div>
+                      )}
+                      <button onClick={() => addToPortfolio(r, buyForm.avgCost, buyForm.shares)}
+                        disabled={!buyForm.avgCost || !buyForm.shares}
+                        style={{ padding: '7px', borderRadius: 6, background: buyForm.avgCost && buyForm.shares ? '#15803D' : '#374151', color: '#fff', border: 'none', fontWeight: 700, fontSize: 12, cursor: buyForm.avgCost && buyForm.shares ? 'pointer' : 'not-allowed' }}>
+                        📊 ポートフォリオへ
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
