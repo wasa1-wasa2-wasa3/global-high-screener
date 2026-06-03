@@ -150,6 +150,7 @@ export async function POST(request) {
           ? new Date(q.earningsTimestamp * 1000).toISOString().slice(0, 10) : null,
         psr:              q.priceToSalesTrailing12Months > 0
           ? Math.round(q.priceToSalesTrailing12Months * 10) / 10 : null,
+        ma50:             q.fiftyDayAverage || null,
         revenueGrowthYoy: fund.revenueGrowthYoy ?? null,
         grossMargin:      fund.grossMargin      ?? null,
         revCAGR3Y:        fund.revCAGR3Y        ?? null,
@@ -159,6 +160,21 @@ export async function POST(request) {
         row.rs = Math.round((stockFactor / qqqFactor) * 100) / 100;
       }
       row.islandReversal = isIslandReversal(ohlc);
+      if (ohlc && ohlc.length >= 15) {
+        const slice = ohlc.slice(-15);
+        let trSum = 0;
+        for (let k = 1; k < slice.length; k++) {
+          const prev = slice[k - 1].close;
+          const tr = Math.max(
+            slice[k].high - slice[k].low,
+            Math.abs(slice[k].high - prev),
+            Math.abs(slice[k].low  - prev)
+          );
+          trSum += tr;
+        }
+        const atr14 = trSum / 14;
+        row.atr14Pct = row.price > 0 ? Math.round(atr14 / row.price * 10000) / 100 : null;
+      }
       row.score          = calcScore(row);
       if (row.islandReversal) row.score = Math.min(100, row.score + 5);
       row.trendMode      = getTrendMode(row);

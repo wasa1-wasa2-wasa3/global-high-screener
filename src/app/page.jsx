@@ -493,6 +493,9 @@ export default function Page() {
   const [buyForm, setBuyForm]                   = useState({ avgCost: '', shares: '' });
   const [sortField, setSortField]               = useState(null);
   const [sortDir, setSortDir]                   = useState('desc');
+  const [bearMarket, setBearMarket]             = useState(false);
+  const [qqqClose, setQqqClose]                 = useState(null);
+  const [qqqMa200, setQqqMa200]                 = useState(null);
   const [pipelineAlerts, setPipelineAlerts]     = useState([]);
   const [toast, setToast]                       = useState(null);
   const [scrolled, setScrolled]                 = useState(false);
@@ -519,7 +522,15 @@ export default function Page() {
   useEffect(() => {
     try {
       const saved = localStorage.getItem(LAST_SCAN_KEY);
-      if (saved) { const d = JSON.parse(saved); setScanResults(d.rows || []); setScannedAt(d.scannedAt); if (d.scannedCount) setScannedCount(d.scannedCount); }
+      if (saved) {
+        const d = JSON.parse(saved);
+        setScanResults(d.rows || []);
+        setScannedAt(d.scannedAt);
+        if (d.scannedCount) setScannedCount(d.scannedCount);
+        if (d.bearMarket != null) setBearMarket(d.bearMarket);
+        if (d.qqqClose  != null) setQqqClose(d.qqqClose);
+        if (d.qqqMa200  != null) setQqqMa200(d.qqqMa200);
+      }
       const savedHidden = localStorage.getItem(HIDDEN_SCAN_KEY);
       if (savedHidden) { const d = JSON.parse(savedHidden); setHiddenResults(d.rows || []); }
       const savedHist = localStorage.getItem(BREAKOUT_HIST_KEY);
@@ -587,7 +598,15 @@ export default function Page() {
       setScanResults(rows);
       setScannedAt(data.scannedAt);
       setScannedCount(data.scannedCount || null);
-      localStorage.setItem(LAST_SCAN_KEY, JSON.stringify({ rows, scannedAt: data.scannedAt, scannedCount: data.scannedCount }));
+      setBearMarket(data.bearMarket ?? false);
+      setQqqClose(data.qqqClose ?? null);
+      setQqqMa200(data.qqqMa200 ?? null);
+      localStorage.setItem(LAST_SCAN_KEY, JSON.stringify({
+        rows, scannedAt: data.scannedAt, scannedCount: data.scannedCount,
+        bearMarket: data.bearMarket ?? false,
+        qqqClose: data.qqqClose ?? null,
+        qqqMa200: data.qqqMa200 ?? null,
+      }));
 
       // ブレイクアウト銘柄を履歴に追記
       const newBreakouts = rows.filter(r => r.trendMode === 'breakout');
@@ -872,6 +891,26 @@ export default function Page() {
             </div>
             <div style={{ fontSize: 10, color: '#64748B', textAlign: 'center' }}>
               ⚠️ 購入後は必ず逆指値注文を入れてください（-10%）
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bear market banner */}
+      {bearMarket && tab === 'scan' && (
+        <div style={{
+          marginBottom: 14, padding: '11px 16px',
+          background: 'linear-gradient(135deg,#1C0A0A,#3B0000)',
+          border: '2px solid #DC2626', borderRadius: 12,
+          display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: 20 }}>⚠️</span>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#F87171' }}>
+              弱気相場 — 新規エントリー非推奨
+            </div>
+            <div style={{ fontSize: 11, color: '#FCA5A5', marginTop: 2 }}>
+              QQQ ${qqqClose?.toFixed(2)} {'<'} MA200 ${qqqMa200?.toFixed(2)} — 上昇トレンドが回復するまで新規エントリーは控えてください
             </div>
           </div>
         </div>

@@ -407,8 +407,32 @@ export async function POST() {
           }
         }
       }
+      if (ohlc && ohlc.length >= 15) {
+        const slice = ohlc.slice(-15);
+        let trSum = 0;
+        for (let k = 1; k < slice.length; k++) {
+          const prev = slice[k - 1].close;
+          const tr = Math.max(
+            slice[k].high - slice[k].low,
+            Math.abs(slice[k].high - prev),
+            Math.abs(slice[k].low  - prev)
+          );
+          trSum += tr;
+        }
+        const atr14 = trSum / 14;
+        row.atr14Pct = row.price > 0 ? Math.round(atr14 / row.price * 10000) / 100 : null;
+      }
       row.score = calcScore(row);
     });
+
+    const qqqMa200 = (() => {
+      if (!qqqChart || qqqChart.length < 20) return null;
+      const window = qqqChart.slice(-200);
+      return window.reduce((s, c) => s + c.close, 0) / window.length;
+    })();
+    const qqqClose = qqqChart?.at(-1)?.close ?? null;
+    const bearMarket = qqqMa200 != null && qqqClose != null && qqqClose < qqqMa200;
+
     rows.sort((a, b) => b.score - a.score);
     const capped = applySectorCap(rows);
 
@@ -446,6 +470,9 @@ export async function POST() {
       scannedCount,
       scannedAt: new Date().toISOString(),
       source: screenerHasFull ? 'screener' : screenerOk ? 'screener+v7' : 'static',
+      bearMarket,
+      qqqClose,
+      qqqMa200: qqqMa200 != null ? Math.round(qqqMa200 * 100) / 100 : null,
     });
   } catch (e) {
     return Response.json({ error: e.message }, { status: 500 });

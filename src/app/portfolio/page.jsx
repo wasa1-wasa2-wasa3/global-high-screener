@@ -25,6 +25,15 @@ function navStyle(active) {
   };
 }
 
+function calcStopPrice(avgCost, atr14Pct, ma50) {
+  if (!avgCost) return null;
+  if (atr14Pct != null && atr14Pct > 0) {
+    const atrStop = avgCost * (1 - 2.5 * atr14Pct / 100);
+    return ma50 != null && ma50 > 0 ? Math.max(atrStop, ma50) : atrStop;
+  }
+  return avgCost * (1 - 15 / 100);
+}
+
 function fmtUSD(v) {
   if (v == null) return '—';
   return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -41,7 +50,7 @@ export default function PortfolioPage() {
   const [items, setItems]             = useState({});
   const [tickerInput, setTickerInput] = useState('');
   const [scanning, setScanning]       = useState(false);
-  const [stopLoss, setStopLoss]       = useState(-10);
+  const [stopLoss, setStopLoss]       = useState(-15);
   const [takeProfit, setTakeProfit]   = useState(20);
   const [usdJpy, setUsdJpy]           = useState(null);
   const [isMobile, setIsMobile]       = useState(false);
@@ -284,15 +293,18 @@ export default function PortfolioPage() {
     const withPnl = scanned
       .filter(r => !r.is_otoko_kabu && r.avgCost != null)
       .map(r => ({ ...r, pnlPct: (r.price / r.avgCost - 1) * 100 }));
-    withPnl.filter(r => r.pnlPct <= stopLoss).sort((a, b) => a.pnlPct - b.pnlPct)
+    withPnl.filter(r => {
+      const sp = calcStopPrice(r.avgCost, r.atr14Pct, r.ma50);
+      return sp != null ? r.price <= sp : r.pnlPct <= -15;
+    }).sort((a, b) => a.pnlPct - b.pnlPct)
       .forEach(t => actions.push({ icon: '🚨', color: '#DC2626', border: '#FCA5A5', bg: 'linear-gradient(135deg,#FEF2F2,#FEE2E2)',
         msg: `${t.ticker} が ${t.pnlPct.toFixed(1)}%。損切り実行を検討してください。` }));
-    withPnl.filter(r => r.pnlPct >= takeProfit && r.holdingShares != null).sort((a, b) => b.pnlPct - a.pnlPct)
-      .forEach(t => {
-        const sharesToSell = Math.ceil(t.holdingShares * t.avgCost / t.price);
-        actions.push({ icon: '💡', color: '#92400E', border: '#F59E0B', bg: 'linear-gradient(135deg,#FFFBEB,#FEF9C3)',
-          msg: `${t.ticker} が +${t.pnlPct.toFixed(0)}%。${sharesToSell}株売却で元本 ${fmtUSD(t.holdingShares * t.avgCost)} を回収できます。` });
-      });
+    withPnl.filter(r => r.pnlPct >= takeProfit && r.ma50 != null && r.price < r.ma50 && (r.volRatio ?? 0) >= 1.5).sort((a, b) => b.pnlPct - a.pnlPct)
+      .forEach(t => actions.push({ icon: '💰', color: '#065F46', border: '#6EE7B7', bg: 'linear-gradient(135deg,#ECFDF5,#D1FAE5)',
+        msg: `${t.ticker} が +${t.pnlPct.toFixed(0)}%。MA50割れ、利益を確定してください。` }));
+    withPnl.filter(r => r.pnlPct >= takeProfit && !(r.ma50 != null && r.price < r.ma50 && (r.volRatio ?? 0) >= 1.5)).sort((a, b) => b.pnlPct - a.pnlPct)
+      .forEach(t => actions.push({ icon: '🛡️', color: '#1D4ED8', border: '#93C5FD', bg: 'linear-gradient(135deg,#EFF6FF,#DBEAFE)',
+        msg: `${t.ticker} が +${t.pnlPct.toFixed(0)}%。ストップを建値 ${fmtUSD(t.avgCost)} に引き上げてください。` }));
     const pipeline = scanned.filter(r => !r.is_otoko_kabu && r.avgCost != null)
       .map(r => ({ ...r, pnlPct: (r.price / r.avgCost - 1) * 100 }))
       .filter(r => (r.volRatio ?? 0) > 2.0 && (r.dayChangePct ?? 0) > 3.0);
@@ -520,27 +532,34 @@ export default function PortfolioPage() {
             const pnlUSD = (holdingShares != null && avgCost != null && price) ? (price - avgCost) * holdingShares : null;
             const costBasis = (holdingShares != null && avgCost != null) ? holdingShares * avgCost : null;
             const sharesToSell = (costBasis != null && price) ? Math.ceil(costBasis / price) : null;
-            const showRecovery = !r.is_otoko_kabu && pnlPct != null && pnlPct >= takeProfit && costBasis != null;
-            const stopPrice = avgCost ? avgCost * (1 + stopLoss / 100) : null;
+            const stopPrice = calcStopPrice(avgCost, r.atr14Pct, r.ma50);
             const takeProfitPrice = avgCost ? avgCost * (1 + takeProfit / 100) : null;
+            const showBreakeven  = !r.is_otoko_kabu && pnlPct != null && pnlPct >= takeProfit;
+            const showProfitExit = !r.is_otoko_kabu
+              && pnlPct != null && pnlPct > 0
+              && r.price != null && r.ma50 != null && r.price < r.ma50
+              && (r.volRatio ?? 0) >= 1.5;
             const isCopied = copiedTicker === r.ticker;
 
             let cardBg = '#fff', cardBorder = '1px solid #E2E8F0';
             if (r.is_otoko_kabu) { cardBg = '#FFFBEB'; cardBorder = '1px solid #F59E0B'; }
             else if (pnlPct != null) {
-              if (pnlPct <= stopLoss) { cardBg = '#FEF2F2'; cardBorder = '1px solid #FCA5A5'; }
+              const isStopTriggered = stopPrice != null ? r.price <= stopPrice : pnlPct <= -15;
+              if (isStopTriggered) { cardBg = '#FEF2F2'; cardBorder = '1px solid #FCA5A5'; }
               else if (pnlPct >= takeProfit) { cardBg = '#F0FDF4'; cardBorder = '1px solid #86EFAC'; }
             }
 
             const actionBadge = (() => {
-              if (r.is_otoko_kabu)      return { icon: '💰', label: '元本回収済・ガチホ', color: '#92400E', bg: '#FEF9C3',  border: '#F59E0B' };
-              if (pnlPct == null)        return null;
-              if (pnlPct <= stopLoss)    return { icon: '🚨', label: '損切り実行',         color: '#DC2626', bg: '#FEF2F2',  border: '#FCA5A5' };
-              if (pnlPct >= takeProfit)  return { icon: '💡', label: '元本を回収する', color: '#92400E', bg: '#FFFBEB',  border: '#F59E0B' };
+              if (r.is_otoko_kabu)   return { icon: '💰', label: '元本回収済・ガチホ',      color: '#92400E', bg: '#FEF9C3', border: '#F59E0B' };
+              if (pnlPct == null)    return null;
+              const isStopTriggered = stopPrice != null ? r.price <= stopPrice : pnlPct <= -15;
+              if (isStopTriggered)   return { icon: '🚨', label: '損切り実行',              color: '#DC2626', bg: '#FEF2F2', border: '#FCA5A5' };
+              if (showProfitExit)    return { icon: '💰', label: '利確実行',                color: '#065F46', bg: '#DCFCE7', border: '#6EE7B7' };
+              if (showBreakeven)     return { icon: '🛡️', label: 'ストップを建値に引き上げ', color: '#1D4ED8', bg: '#EFF6FF', border: '#93C5FD' };
               if ((r.volRatio ?? 0) > 2.0 && (r.dayChangePct ?? 0) > 3.0)
-                                         return { icon: '🔥', label: '買い増し',           color: '#15803D', bg: '#DCFCE7',  border: '#86EFAC' };
-              if (pnlPct > 0)            return { icon: '🟢', label: 'ガチホ継続',         color: '#15803D', bg: '#F0FDF4',  border: '#86EFAC' };
-              return                            { icon: '🟡', label: '調整中・様子見',     color: '#D97706', bg: '#FFFBEB',  border: '#FDE68A' };
+                                     return { icon: '🔥', label: '買い増し',                color: '#15803D', bg: '#DCFCE7', border: '#86EFAC' };
+              if (pnlPct > 0)        return { icon: '🟢', label: 'ガチホ継続',              color: '#15803D', bg: '#F0FDF4', border: '#86EFAC' };
+              return                        { icon: '🟡', label: '調整中・様子見',          color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' };
             })();
 
             return (
@@ -573,11 +592,19 @@ export default function PortfolioPage() {
                 </div>
 
                 <div style={{ padding: '12px 14px' }}>
-                  {showRecovery && (
-                    <div style={{ background: '#FFFBEB', border: '2px solid #F59E0B', borderRadius: 10, padding: '10px 14px', marginBottom: 10 }}>
-                      <div style={{ fontSize: 15, fontWeight: 800, color: '#D97706' }}>💡 元本回収タイミング！</div>
-                      <div style={{ fontSize: 13, color: '#92400E', fontWeight: 600, marginTop: 2 }}>
-                        {sharesToSell}株を売却 → {fmtUSD(costBasis)} を回収
+                  {showProfitExit && (
+                    <div style={{ background: '#ECFDF5', border: '2px solid #059669', borderRadius: 10, padding: '10px 14px', marginBottom: 10 }}>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: '#065F46' }}>💰 利確実行タイミング！</div>
+                      <div style={{ fontSize: 13, color: '#065F46', fontWeight: 600, marginTop: 2 }}>
+                        MA50割れ × 出来高{r.volRatio?.toFixed(1)}x — 利益確定を検討してください
+                      </div>
+                    </div>
+                  )}
+                  {showBreakeven && !showProfitExit && (
+                    <div style={{ background: '#EFF6FF', border: '2px solid #3B82F6', borderRadius: 10, padding: '10px 14px', marginBottom: 10 }}>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: '#1D4ED8' }}>🛡️ 逆指値を建値に引き上げ</div>
+                      <div style={{ fontSize: 13, color: '#1E40AF', fontWeight: 600, marginTop: 2 }}>
+                        +{pnlPct?.toFixed(0)}% 到達 — 逆指値を取得単価 {fmtUSD(avgCost)} に引き上げてください
                       </div>
                     </div>
                   )}
@@ -622,7 +649,11 @@ export default function PortfolioPage() {
                           {r.is_otoko_kabu
                             ? <div style={{ fontSize: 16, fontWeight: 700, color: '#475569' }}>─ 恩株</div>
                             : <div style={{ fontSize: 19, fontWeight: 900, color: '#F87171' }}>{fmtUSD(stopPrice)}</div>}
-                          {!r.is_otoko_kabu && <div style={{ fontSize: 9, color: '#64748B' }}>× {(1 + stopLoss / 100).toFixed(2)}</div>}
+                          {!r.is_otoko_kabu && (
+                            <div style={{ fontSize: 9, color: '#64748B' }}>
+                              {r.atr14Pct != null ? `2.5×ATR (${r.atr14Pct.toFixed(1)}%)` : 'Fallback -15%'}
+                            </div>
+                          )}
                         </div>
                         <div style={{ width: 1, background: 'rgba(255,255,255,0.1)' }} />
                         <div style={{ flex: 1 }}>
@@ -651,7 +682,7 @@ export default function PortfolioPage() {
                         <button onClick={() => toggleOtokoKabu(r.ticker)}
                           style={{ minHeight: 42, padding: '0 14px', borderRadius: 8, border: '1px solid #E2E8F0', background: '#fff', color: '#94A3B8', cursor: 'pointer', fontSize: 12 }}>解除</button>
                       </>
-                    ) : showRecovery ? (
+                    ) : showBreakeven ? (
                       <button onClick={() => toggleOtokoKabu(r.ticker)}
                         style={{ flex: 1, minHeight: 46, borderRadius: 10, border: 'none', background: '#F59E0B', color: '#fff', cursor: 'pointer', fontWeight: 800, fontSize: 15 }}>
                         ✨ 恩株化する
@@ -693,28 +724,34 @@ export default function PortfolioPage() {
                 const pnlPct = (avgCost && price) ? (price / avgCost - 1) * 100 : null;
                 const pnlUSD = (holdingShares != null && avgCost != null && price) ? (price - avgCost) * holdingShares : null;
                 const costBasis = (holdingShares != null && avgCost != null) ? holdingShares * avgCost : null;
-                const sharesToSell = (costBasis != null && price) ? Math.ceil(costBasis / price) : null;
-                const showRecovery = !r.is_otoko_kabu && pnlPct != null && pnlPct >= takeProfit && costBasis != null;
-                const stopPrice = avgCost ? avgCost * (1 + stopLoss / 100) : null;
+                const stopPrice = calcStopPrice(avgCost, r.atr14Pct, r.ma50);
                 const takeProfitPrice = avgCost ? avgCost * (1 + takeProfit / 100) : null;
+                const showBreakeven  = !r.is_otoko_kabu && pnlPct != null && pnlPct >= takeProfit;
+                const showProfitExit = !r.is_otoko_kabu
+                  && pnlPct != null && pnlPct > 0
+                  && r.price != null && r.ma50 != null && r.price < r.ma50
+                  && (r.volRatio ?? 0) >= 1.5;
                 const pct52 = r.high52Pct != null ? parseFloat(r.high52Pct) : null;
 
                 let rowBg = i % 2 === 0 ? '#F8FAFC' : '#fff';
                 if (r.is_otoko_kabu) rowBg = '#FFFBEB';
                 else if (pnlPct != null) {
-                  if (pnlPct <= stopLoss) rowBg = '#FEF2F2';
+                  const isStopTriggered = stopPrice != null ? r.price <= stopPrice : pnlPct <= -15;
+                  if (isStopTriggered) rowBg = '#FEF2F2';
                   else if (pnlPct >= takeProfit) rowBg = '#F0FDF4';
                 }
 
                 const actionBadge = (() => {
-                  if (r.is_otoko_kabu)      return { icon: '💰', label: '元本回収済・ガチホ', color: '#92400E', bg: '#FEF9C3',  border: '#F59E0B' };
-                  if (pnlPct == null)        return null;
-                  if (pnlPct <= stopLoss)    return { icon: '🚨', label: '損切り実行',         color: '#DC2626', bg: '#FEF2F2',  border: '#FCA5A5' };
-                  if (pnlPct >= takeProfit)  return { icon: '💡', label: '元本を回収する', color: '#92400E', bg: '#FFFBEB',  border: '#F59E0B' };
+                  if (r.is_otoko_kabu)   return { icon: '💰', label: '元本回収済・ガチホ',      color: '#92400E', bg: '#FEF9C3', border: '#F59E0B' };
+                  if (pnlPct == null)    return null;
+                  const isStopTriggered = stopPrice != null ? r.price <= stopPrice : pnlPct <= -15;
+                  if (isStopTriggered)   return { icon: '🚨', label: '損切り実行',              color: '#DC2626', bg: '#FEF2F2', border: '#FCA5A5' };
+                  if (showProfitExit)    return { icon: '💰', label: '利確実行',                color: '#065F46', bg: '#DCFCE7', border: '#6EE7B7' };
+                  if (showBreakeven)     return { icon: '🛡️', label: 'ストップを建値に引き上げ', color: '#1D4ED8', bg: '#EFF6FF', border: '#93C5FD' };
                   if ((r.volRatio ?? 0) > 2.0 && (r.dayChangePct ?? 0) > 3.0)
-                                             return { icon: '🔥', label: '買い増し',           color: '#15803D', bg: '#DCFCE7',  border: '#86EFAC' };
-                  if (pnlPct > 0)            return { icon: '🟢', label: 'ガチホ継続',         color: '#15803D', bg: '#F0FDF4',  border: '#86EFAC' };
-                  return                            { icon: '🟡', label: '調整中・様子見',     color: '#D97706', bg: '#FFFBEB',  border: '#FDE68A' };
+                                         return { icon: '🔥', label: '買い増し',                color: '#15803D', bg: '#DCFCE7', border: '#86EFAC' };
+                  if (pnlPct > 0)        return { icon: '🟢', label: 'ガチホ継続',              color: '#15803D', bg: '#F0FDF4', border: '#86EFAC' };
+                  return                        { icon: '🟡', label: '調整中・様子見',          color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' };
                 })();
 
                 const isCopied = copiedTicker === r.ticker;
@@ -756,12 +793,19 @@ export default function PortfolioPage() {
                     <td style={{ padding: '8px 10px', fontWeight: 600, whiteSpace: 'nowrap' }}>
                       {r.is_otoko_kabu
                         ? <span style={{ color: '#94A3B8' }}>─</span>
-                        : stopPrice ? <span style={{ color: '#DC2626' }}>{fmtUSD(stopPrice)}</span> : '—'}
+                        : stopPrice ? (
+                          <>
+                            <span style={{ color: '#DC2626' }}>{fmtUSD(stopPrice)}</span>
+                            <div style={{ fontSize: 9, color: '#94A3B8', marginTop: 1 }}>
+                              {r.atr14Pct != null ? `2.5×ATR (${r.atr14Pct.toFixed(1)}%)` : 'Fallback -15%'}
+                            </div>
+                          </>
+                        ) : '—'}
                     </td>
                     <td style={{ padding: '8px 10px', fontWeight: 600, color: '#059669', whiteSpace: 'nowrap' }}>
                       {takeProfitPrice ? fmtUSD(takeProfitPrice) : '—'}
-                      {showRecovery && (
-                        <div style={{ fontSize: 10, color: '#D97706', fontWeight: 600, marginTop: 2 }}>💡 {sharesToSell}株売却</div>
+                      {showBreakeven && (
+                        <div style={{ fontSize: 10, color: '#1D4ED8', fontWeight: 600, marginTop: 2 }}>🛡️ 建値に引上げ</div>
                       )}
                     </td>
                     <td style={{ padding: '8px 10px' }}>
@@ -784,7 +828,7 @@ export default function PortfolioPage() {
                       {r.is_otoko_kabu ? (
                         <button onClick={() => toggleOtokoKabu(r.ticker)}
                           style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, border: '1px solid #E2E8F0', background: '#F8FAFC', color: '#94A3B8', cursor: 'pointer', display: 'block', width: '100%', marginBottom: 3 }}>恩株解除</button>
-                      ) : showRecovery ? (
+                      ) : showBreakeven ? (
                         <button onClick={() => toggleOtokoKabu(r.ticker)}
                           style={{ fontSize: 11, padding: '3px 10px', borderRadius: 5, border: 'none', background: '#F59E0B', color: '#fff', cursor: 'pointer', fontWeight: 600, width: '100%', marginBottom: 3 }}>
                           ✨ 恩株化する
@@ -817,7 +861,8 @@ export default function PortfolioPage() {
           <div style={{ marginTop: 10, border: '1px solid #E2E8F0', borderRadius: 10, overflow: 'hidden', fontSize: 12 }}>
             {[
               { icon: '🔥', label: '買い増し',              desc: '出来高2x超 × 前日比+3%超 — ブレイクアウト発生中。ポジション拡大を検討。' },
-              { icon: '💡', label: '元本を回収する',    desc: `利確ライン(+${takeProfit}%)到達。取得総額分の株を売り、残りをリスクフリーで保有。` },
+              { icon: '🛡️', label: 'ストップを建値に引き上げ', desc: `+${takeProfit}%到達。逆指値を取得単価に引き上げリスクをゼロに。` },
+              { icon: '💰', label: '利確実行',              desc: 'MA50割れ×出来高1.5x超×含み益あり。利益を確定するタイミング。' },
               { icon: '💰', label: '元本回収済・ガチホ',    desc: '恩株化完了。コストゼロで無限に保有できる。売らずに夢を見る。' },
               { icon: '🚨', label: '損切り実行',            desc: `損切りライン(${stopLoss}%)到達。今すぐ損失を確定し、資金を次の機会へ。` },
               { icon: '🟡', label: '調整中・様子見',        desc: '損切りも利確もまだ。現在のトレンドが続くか監視。' },
