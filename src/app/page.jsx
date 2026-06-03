@@ -100,9 +100,9 @@ const SCAN_CFG = {
 };
 function TrendLamp({ mode, showLabel = false, watchMode = false, scanMode = false }) {
   if (!mode) {
-    const nullLabel = watchMode ? '待機中' : scanMode ? '★追加して待つ' : '様子見';
+    const nullLabel = watchMode ? 'ブレイク待ち' : scanMode ? '★追加して待つ' : '様子見';
     const nullTip   = watchMode
-      ? '【待機中】エントリーサイン（大出来高×高値突破）がまだ出ていません。ウォッチを続けて発火を待ちましょう。'
+      ? '【ブレイク待ち】出来高が平均の2倍になり52週高値を突破したらエントリー。それまでウォッチを続けてください。'
       : scanMode
         ? '【高値圏付近】まだ特定のトレンドシグナルはありません。★でウォッチリストに追加して様子を見ましょう。'
         : '→ 様子見 — 特定のトレンドシグナルなし';
@@ -110,7 +110,7 @@ function TrendLamp({ mode, showLabel = false, watchMode = false, scanMode = fals
       <span title={nullTip}
         style={{ display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0, color: '#CBD5E1' }}>
         <span style={{ fontSize: 13, fontWeight: 700, lineHeight: 1 }}>→</span>
-        {showLabel && <span style={{ fontSize: 10, fontWeight: 600 }}>{nullLabel}</span>}
+        {showLabel && <span style={{ fontSize: watchMode ? 13 : 10, fontWeight: 600 }}>{nullLabel}</span>}
       </span>
     );
   }
@@ -129,7 +129,7 @@ function TrendLamp({ mode, showLabel = false, watchMode = false, scanMode = fals
         } : {}),
       }}>
       <span style={{ fontSize: isBreakout ? 16 : 13, fontWeight: 700, lineHeight: 1 }}>{cfg.arrow}</span>
-      {showLabel && <span style={{ fontSize: 10, fontWeight: 700 }}>{cfg.label}</span>}
+      {showLabel && <span style={{ fontSize: watchMode ? 13 : 10, fontWeight: 700 }}>{cfg.label}</span>}
     </span>
   );
 }
@@ -235,6 +235,7 @@ function SignalBadges({ score, signals, specialDividend, rs, earningsDate, marke
 // ─── Desktop row ───────────────────────────────────────────────────────────
 function ScanRow({ row, rank, watchlist, onWatch, usdJpy, onEnrich,
                    isWatchTab = false, buyingTicker, onBuyToggle, buyForm, onBuyFormChange, onBuySubmit }) {
+  const [sigOpen, setSigOpen] = React.useState(false);
   const signals   = getSignals(row);
   const isWatched = !!watchlist[row.ticker];
   const pct       = parseFloat(row.high52Pct);
@@ -304,7 +305,22 @@ function ScanRow({ row, rank, watchlist, onWatch, usdJpy, onEnrich,
           {row.grossMargin != null ? row.grossMargin.toFixed(1) + '%' : '—'}
         </td>
         <td style={{ padding: '8px 10px' }}>
-          <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} rs={row.rs} earningsDate={row.earningsDate} marketCap={row.marketCap} />
+          {isWatchTab ? (
+            <>
+              <button
+                onClick={() => setSigOpen(v => !v)}
+                style={{ fontSize: 11, color: '#64748B', background: 'none', border: '1px solid #E2E8F0', borderRadius: 5, padding: '2px 6px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                {sigOpen ? '詳細 ▲' : '詳細 ▼'}
+              </button>
+              {sigOpen && (
+                <div style={{ marginTop: 4 }}>
+                  <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} rs={row.rs} earningsDate={row.earningsDate} marketCap={row.marketCap} />
+                </div>
+              )}
+            </>
+          ) : (
+            <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} rs={row.rs} earningsDate={row.earningsDate} marketCap={row.marketCap} />
+          )}
         </td>
         <td style={{ padding: '8px 10px', textAlign: 'center' }}>
           <ScoreBadge score={row.score} />
@@ -357,6 +373,7 @@ function MetricCell({ label, value, color = '#374151', bg = '#F8FAFC', sub = nul
 
 function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich,
                     isWatchTab = false, buyingTicker, onBuyToggle, buyForm, onBuyFormChange, onBuySubmit }) {
+  const [sigOpen, setSigOpen] = React.useState(false);
   const signals   = getSignals(row);
   const isWatched = !!watchlist[row.ticker];
   const pct       = parseFloat(row.high52Pct);
@@ -423,7 +440,22 @@ function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich,
             color={row.grossMargin != null ? (row.grossMargin >= 70 ? '#15803D' : row.grossMargin >= 50 ? '#D97706' : '#64748B') : '#CBD5E1'}
             bg={row.grossMargin != null && row.grossMargin >= 70 ? '#ECFDF5' : '#F8FAFC'} />
         </div>
-        <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} rs={row.rs} earningsDate={row.earningsDate} marketCap={row.marketCap} />
+        {isWatchTab ? (
+          <>
+            <button
+              onClick={() => setSigOpen(v => !v)}
+              style={{ fontSize: 11, color: '#64748B', background: 'none', border: '1px solid #E2E8F0', borderRadius: 5, padding: '2px 6px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              {sigOpen ? '詳細 ▲' : '詳細 ▼'}
+            </button>
+            {sigOpen && (
+              <div style={{ marginTop: 4 }}>
+                <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} rs={row.rs} earningsDate={row.earningsDate} marketCap={row.marketCap} />
+              </div>
+            )}
+          </>
+        ) : (
+          <SignalBadges score={row.score} signals={signals} specialDividend={row.specialDividend} rs={row.rs} earningsDate={row.earningsDate} marketCap={row.marketCap} />
+        )}
         {isWatchTab && row.trendMode === 'breakout' && (
           <button onClick={() => onBuyToggle(row.ticker)}
             style={{ marginTop: 10, width: '100%', padding: '9px', borderRadius: 8, background: isBuying ? '#DCFCE7' : '#F0FDF4', color: '#15803D', border: '1px solid #86EFAC', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
@@ -1257,8 +1289,13 @@ export default function Page() {
               今すぐエントリー検討！ {pipelineAlerts.length}銘柄がブレイクアウト
             </span>
           </div>
+          {pipelineAlerts.length >= 2 && (
+            <div style={{ marginBottom: 10, padding: '6px 10px', background: 'rgba(251,191,36,0.15)', border: '1px solid #F59E0B', borderRadius: 8, fontSize: 12, color: '#FDE68A', lineHeight: 1.6 }}>
+              ⚠️ 同時エントリーは非推奨。スコア最上位の1銘柄を選んでください。
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-            {pipelineAlerts.map(r => {
+            {[...pipelineAlerts].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).map(r => {
               const isBuying = buyingTicker === r.ticker;
               const stopPrice = r.atr14Pct != null && r.price
                 ? Math.max(r.price * (1 - 2.5 * r.atr14Pct / 100), r.ma50 || 0)
