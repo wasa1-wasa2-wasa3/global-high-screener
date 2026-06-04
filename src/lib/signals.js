@@ -51,7 +51,7 @@ export function getSignals(row) {
 
   const stopThreshold = mc > 0 && mc < 2_000_000_000 ? -25 : -15;
   if (ma50d < stopThreshold) {
-    signals.push({ type: 'stopLoss', icon: '🛑', label: '損切り検討', color: '#7F1D1D' });
+    signals.push({ type: 'stopLoss', icon: '🛑', label: 'テクニカル悪化', color: '#7F1D1D' });
   }
 
   if ((row.dividendYield || 0) >= 3.0) {

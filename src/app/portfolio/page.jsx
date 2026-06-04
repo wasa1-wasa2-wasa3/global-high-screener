@@ -34,6 +34,14 @@ function calcStopPrice(avgCost, atr14Pct, ma50) {
   return avgCost * (1 - 15 / 100);
 }
 
+function calcTakeProfit(avgCost, atr14Pct, fallbackPct = 20) {
+  if (!avgCost) return null;
+  if (atr14Pct != null && atr14Pct > 0) {
+    return avgCost + 3 * (avgCost * atr14Pct / 100);
+  }
+  return avgCost * (1 + fallbackPct / 100);
+}
+
 function fmtUSD(v) {
   if (v == null) return '—';
   return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -60,6 +68,10 @@ export default function PortfolioPage() {
   const [entryPopup, setEntryPopup]   = useState(null);
   const [popupShares, setPopupShares] = useState('');
   const [popupCost, setPopupCost]     = useState('');
+  const [accountSize, setAccountSize] = useState(() => {
+    try { return localStorage.getItem('us_account_size_v1') || ''; } catch { return ''; }
+  });
+  const [riskPct, setRiskPct] = useState('2');
   const userRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -299,10 +311,34 @@ export default function PortfolioPage() {
     }).sort((a, b) => a.pnlPct - b.pnlPct)
       .forEach(t => actions.push({ icon: '🚨', color: '#DC2626', border: '#FCA5A5', bg: 'linear-gradient(135deg,#FEF2F2,#FEE2E2)',
         msg: `${t.ticker} が ${t.pnlPct.toFixed(1)}%。損切り実行を検討してください。` }));
-    withPnl.filter(r => r.pnlPct >= takeProfit && r.ma50 != null && r.price < r.ma50 && (r.volRatio ?? 0) >= 1.5).sort((a, b) => b.pnlPct - a.pnlPct)
+    withPnl.filter(r => {
+      if (!r.earningsDate) return false;
+      const daysTo = (new Date(r.earningsDate) - Date.now()) / 86400000;
+      return daysTo >= 0 && daysTo < 3 && r.pnlPct > 0 && !r.is_otoko_kabu;
+    }).sort((a, b) => {
+      const dA = (new Date(a.earningsDate) - Date.now()) / 86400000;
+      const dB = (new Date(b.earningsDate) - Date.now()) / 86400000;
+      return dA - dB;
+    }).forEach(t => {
+      const daysTo = Math.ceil((new Date(t.earningsDate) - Date.now()) / 86400000);
+      actions.push({
+        icon: '⏳', color: '#92400E', border: '#FDE68A',
+        bg: 'linear-gradient(135deg,#FFFBEB,#FEF3C7)',
+        msg: `${t.ticker} 決算${daysTo}日前。含み益 +${t.pnlPct.toFixed(1)}%。建値ストップへの引き上げを確認してください。`,
+      });
+    });
+    withPnl.filter(r => {
+      const tp = calcTakeProfit(r.avgCost, r.atr14Pct);
+      return tp != null && r.price != null && r.price >= tp && !r.is_otoko_kabu
+        && r.ma50 != null && r.price < r.ma50 && (r.volRatio ?? 0) >= 1.5;
+    }).sort((a, b) => b.pnlPct - a.pnlPct)
       .forEach(t => actions.push({ icon: '💰', color: '#065F46', border: '#6EE7B7', bg: 'linear-gradient(135deg,#ECFDF5,#D1FAE5)',
         msg: `${t.ticker} が +${t.pnlPct.toFixed(0)}%。MA50割れ、利益を確定してください。` }));
-    withPnl.filter(r => r.pnlPct >= takeProfit && !(r.ma50 != null && r.price < r.ma50 && (r.volRatio ?? 0) >= 1.5)).sort((a, b) => b.pnlPct - a.pnlPct)
+    withPnl.filter(r => {
+      const tp = calcTakeProfit(r.avgCost, r.atr14Pct);
+      return tp != null && r.price != null && r.price >= tp && !r.is_otoko_kabu
+        && !(r.ma50 != null && r.price < r.ma50 && (r.volRatio ?? 0) >= 1.5);
+    }).sort((a, b) => b.pnlPct - a.pnlPct)
       .forEach(t => actions.push({ icon: '🛡️', color: '#1D4ED8', border: '#93C5FD', bg: 'linear-gradient(135deg,#EFF6FF,#DBEAFE)',
         msg: `${t.ticker} が +${t.pnlPct.toFixed(0)}%。ストップを建値 ${fmtUSD(t.avgCost)} に引き上げてください。` }));
     const pipeline = scanned.filter(r => !r.is_otoko_kabu && r.avgCost != null)
@@ -403,13 +439,42 @@ export default function PortfolioPage() {
                   <input type="number" min="0" step="0.01" value={popupCost} onChange={e => setPopupCost(e.target.value)}
                     style={{ display: 'block', width: '100%', marginTop: 5, padding: '10px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 15, boxSizing: 'border-box' }} />
                 </label>
+                <label style={{ fontSize: 12, color: '#64748B' }}>口座残高 (USD)
+                  <input type="number" min="0" value={accountSize}
+                    onChange={e => { setAccountSize(e.target.value); try { localStorage.setItem('us_account_size_v1', e.target.value); } catch {} }}
+                    placeholder="例: 10000"
+                    style={{ display: 'block', width: '100%', marginTop: 5, padding: '10px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 15, boxSizing: 'border-box' }} />
+                </label>
+                <label style={{ fontSize: 12, color: '#64748B', marginTop: 8, display: 'block' }}>リスク許容率 (%)
+                  <input type="number" min="0.1" max="10" step="0.1" value={riskPct}
+                    onChange={e => setRiskPct(e.target.value)}
+                    style={{ display: 'block', width: '100%', marginTop: 5, padding: '10px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 15, boxSizing: 'border-box' }} />
+                </label>
               </div>
               <div style={{ background: '#F8FAFC', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: '#64748B' }}>
                 <div style={{ fontWeight: 600, color: '#374151', marginBottom: 4 }}>エントリー後の損切り・回収ライン（目安）</div>
                 {popupCost ? (
                   <>
-                    <div>損切り <strong style={{ color: '#DC2626' }}>{fmtUSD(Number(popupCost) * (1 + stopLoss / 100))}</strong> <span style={{ color: '#94A3B8' }}>(× {(1 + stopLoss / 100).toFixed(2)})</span></div>
-                    <div>元本回収 <strong style={{ color: '#059669' }}>{fmtUSD(Number(popupCost) * (1 + takeProfit / 100))}</strong> <span style={{ color: '#94A3B8' }}>(× {(1 + takeProfit / 100).toFixed(2)})</span></div>
+                    <div>損切り <strong style={{ color: '#DC2626' }}>{fmtUSD(calcStopPrice(Number(popupCost), entryPopup?.atr14Pct, entryPopup?.ma50))}</strong></div>
+                    <div>利確目安 <strong style={{ color: '#059669' }}>{fmtUSD(calcTakeProfit(Number(popupCost), entryPopup?.atr14Pct))}</strong> <span style={{ color: '#94A3B8' }}>(3×ATR)</span></div>
+                    {(() => {
+                      const cost = Number(popupCost);
+                      const acct = Number(accountSize);
+                      const rpct = Number(riskPct);
+                      if (!cost || !acct || !rpct) return null;
+                      const sp = calcStopPrice(cost, entryPopup?.atr14Pct, entryPopup?.ma50);
+                      const riskPerShare = sp != null ? cost - sp : cost * 0.15;
+                      if (riskPerShare <= 0) return null;
+                      const suggestedShares = Math.floor(acct * rpct / 100 / riskPerShare);
+                      return (
+                        <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #E2E8F0' }}>
+                          推奨株数 <strong style={{ color: '#1D4ED8', fontSize: 16 }}>{suggestedShares} 株</strong>
+                          <span style={{ fontSize: 10, color: '#94A3B8', marginLeft: 4 }}>
+                            ({fmtUSD(acct)} × {rpct}% ÷ {fmtUSD(riskPerShare)}/株)
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </>
                 ) : <span>取得単価を入力すると表示されます</span>}
               </div>
@@ -533,8 +598,8 @@ export default function PortfolioPage() {
             const costBasis = (holdingShares != null && avgCost != null) ? holdingShares * avgCost : null;
             const sharesToSell = (costBasis != null && price) ? Math.ceil(costBasis / price) : null;
             const stopPrice = calcStopPrice(avgCost, r.atr14Pct, r.ma50);
-            const takeProfitPrice = avgCost ? avgCost * (1 + takeProfit / 100) : null;
-            const showBreakeven  = !r.is_otoko_kabu && pnlPct != null && pnlPct >= takeProfit;
+            const takeProfitPrice = calcTakeProfit(avgCost, r.atr14Pct);
+            const showBreakeven  = !r.is_otoko_kabu && pnlPct != null && price != null && takeProfitPrice != null && price >= takeProfitPrice;
             const showProfitExit = !r.is_otoko_kabu
               && pnlPct != null && pnlPct > 0
               && r.price != null && r.ma50 != null && r.price < r.ma50
@@ -657,9 +722,9 @@ export default function PortfolioPage() {
                         </div>
                         <div style={{ width: 1, background: 'rgba(255,255,255,0.1)' }} />
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 10, color: '#64748B', marginBottom: 2 }}>元本回収指値</div>
+                          <div style={{ fontSize: 10, color: '#64748B', marginBottom: 2 }}>利確目安 (3×ATR)</div>
                           <div style={{ fontSize: 19, fontWeight: 900, color: '#34D399' }}>{fmtUSD(takeProfitPrice)}</div>
-                          <div style={{ fontSize: 9, color: '#64748B' }}>× {(1 + takeProfit / 100).toFixed(2)}</div>
+                          <div style={{ fontSize: 9, color: '#64748B' }}>{r.atr14Pct != null ? `3×ATR (${r.atr14Pct.toFixed(1)}%)` : 'Fallback +20%'}</div>
                         </div>
                       </div>
                       {holdingShares != null && (
@@ -711,7 +776,7 @@ export default function PortfolioPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: NAVY }}>
-                {['', 'ティッカー', '現在値 (USD)', '前日比', '損益%', '損益 (USD)', '保有数量', '取得単価', '損切り価格', '回収指値', '52W高値比', '恩株管理'].map(h => (
+                {['', 'ティッカー', '現在値 (USD)', '前日比', '損益%', '損益 (USD)', '保有数量', '取得単価', '損切り価格', '利確目安 (3×ATR)', '52W高値比', '恩株管理'].map(h => (
                   <th key={h} style={{ padding: '10px', textAlign: 'left', fontWeight: 600, fontSize: 11, color: '#94A3B8', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
@@ -725,8 +790,8 @@ export default function PortfolioPage() {
                 const pnlUSD = (holdingShares != null && avgCost != null && price) ? (price - avgCost) * holdingShares : null;
                 const costBasis = (holdingShares != null && avgCost != null) ? holdingShares * avgCost : null;
                 const stopPrice = calcStopPrice(avgCost, r.atr14Pct, r.ma50);
-                const takeProfitPrice = avgCost ? avgCost * (1 + takeProfit / 100) : null;
-                const showBreakeven  = !r.is_otoko_kabu && pnlPct != null && pnlPct >= takeProfit;
+                const takeProfitPrice = calcTakeProfit(avgCost, r.atr14Pct);
+                const showBreakeven  = !r.is_otoko_kabu && pnlPct != null && price != null && takeProfitPrice != null && price >= takeProfitPrice;
                 const showProfitExit = !r.is_otoko_kabu
                   && pnlPct != null && pnlPct > 0
                   && r.price != null && r.ma50 != null && r.price < r.ma50

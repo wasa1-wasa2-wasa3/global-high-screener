@@ -47,6 +47,15 @@ function navStyle(active) {
     whiteSpace: 'nowrap',
   };
 }
+function calcStopPrice(avgCost, atr14Pct, ma50) {
+  if (!avgCost) return null;
+  if (atr14Pct != null && atr14Pct > 0) {
+    const atrStop = avgCost * (1 - 2.5 * atr14Pct / 100);
+    return ma50 != null && ma50 > 0 ? Math.max(atrStop, ma50) : atrStop;
+  }
+  return avgCost * (1 - 15 / 100);
+}
+
 function high52Color(pct) {
   if (pct >= 0)   return { color: '#92400E', bg: '#FEF3C7' };
   if (pct >= -3)  return { color: '#065F46', bg: '#ECFDF5' };
@@ -234,7 +243,8 @@ function SignalBadges({ score, signals, specialDividend, rs, earningsDate, marke
 
 // ─── Desktop row ───────────────────────────────────────────────────────────
 function ScanRow({ row, rank, watchlist, onWatch, usdJpy, onEnrich,
-                   isWatchTab = false, buyingTicker, onBuyToggle, buyForm, onBuyFormChange, onBuySubmit }) {
+                   isWatchTab = false, buyingTicker, onBuyToggle, buyForm, onBuyFormChange, onBuySubmit,
+                   accountSize, riskPct }) {
   const [sigOpen, setSigOpen] = React.useState(false);
   const signals   = getSignals(row);
   const isWatched = !!watchlist[row.ticker];
@@ -343,6 +353,17 @@ function ScanRow({ row, rank, watchlist, onWatch, usdJpy, onEnrich,
                   placeholder="10"
                   style={{ width: 70, padding: '4px 8px', borderRadius: 6, border: '1px solid #86EFAC', fontSize: 13 }} />
               </label>
+              {(() => {
+                const cost = Number(buyForm.avgCost) || row.price;
+                const acct = Number(accountSize);
+                const rpct = Number(riskPct);
+                if (!cost || !acct || !rpct) return null;
+                const sp = calcStopPrice(cost, row.atr14Pct, row.ma50);
+                const riskPerShare = sp != null ? cost - sp : cost * 0.15;
+                if (riskPerShare <= 0) return null;
+                const sug = Math.floor(acct * rpct / 100 / riskPerShare);
+                return <div style={{ fontSize: 12, color: '#1D4ED8', fontWeight: 700 }}>推奨株数: {sug} 株</div>;
+              })()}
               <button onClick={() => onBuySubmit(row)}
                 disabled={!buyForm.avgCost || !buyForm.shares}
                 style={{ padding: '5px 16px', borderRadius: 7, background: buyForm.avgCost && buyForm.shares ? '#15803D' : '#94A3B8', color: '#fff', border: 'none', fontWeight: 700, fontSize: 13, cursor: buyForm.avgCost && buyForm.shares ? 'pointer' : 'not-allowed' }}>
@@ -372,7 +393,8 @@ function MetricCell({ label, value, color = '#374151', bg = '#F8FAFC', sub = nul
 }
 
 function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich,
-                    isWatchTab = false, buyingTicker, onBuyToggle, buyForm, onBuyFormChange, onBuySubmit }) {
+                    isWatchTab = false, buyingTicker, onBuyToggle, buyForm, onBuyFormChange, onBuySubmit,
+                    accountSize, riskPct }) {
   const [sigOpen, setSigOpen] = React.useState(false);
   const signals   = getSignals(row);
   const isWatched = !!watchlist[row.ticker];
@@ -480,6 +502,17 @@ function ScanCard({ row, watchlist, onWatch, usdJpy, onEnrich,
               placeholder="10"
               style={{ flex: 1, padding: '6px 10px', borderRadius: 6, border: '1px solid #86EFAC', fontSize: 13 }} />
           </label>
+          {(() => {
+            const cost = Number(buyForm.avgCost) || row.price;
+            const acct = Number(accountSize);
+            const rpct = Number(riskPct);
+            if (!cost || !acct || !rpct) return null;
+            const sp = calcStopPrice(cost, row.atr14Pct, row.ma50);
+            const riskPerShare = sp != null ? cost - sp : cost * 0.15;
+            if (riskPerShare <= 0) return null;
+            const sug = Math.floor(acct * rpct / 100 / riskPerShare);
+            return <div style={{ fontSize: 12, color: '#1D4ED8', fontWeight: 700 }}>推奨株数: {sug} 株</div>;
+          })()}
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => onBuySubmit(row)}
               disabled={!buyForm.avgCost || !buyForm.shares}
@@ -528,6 +561,10 @@ export default function Page() {
   const [bearMarket, setBearMarket]             = useState(false);
   const [qqqClose, setQqqClose]                 = useState(null);
   const [qqqMa200, setQqqMa200]                 = useState(null);
+  const [accountSize, setAccountSize] = useState(() => {
+    try { return localStorage.getItem('us_account_size_v1') || ''; } catch { return ''; }
+  });
+  const [riskPct, setRiskPct] = useState('2');
   const [pipelineAlerts, setPipelineAlerts]     = useState([]);
   const [toast, setToast]                       = useState(null);
   const [scrolled, setScrolled]                 = useState(false);
@@ -1402,7 +1439,8 @@ export default function Page() {
             <ScanCard key={r.ticker} row={r} watchlist={watchlist} onWatch={toggleWatch} usdJpy={usdJpy} onEnrich={openEnrich}
               isWatchTab={tab === 'watchlist'} buyingTicker={buyingTicker} onBuyToggle={handleBuyToggle}
               buyForm={buyForm} onBuyFormChange={(f, v) => setBuyForm(p => ({ ...p, [f]: v }))}
-              onBuySubmit={r => addToPortfolio(r, buyForm.avgCost, buyForm.shares)} />
+              onBuySubmit={r => addToPortfolio(r, buyForm.avgCost, buyForm.shares)}
+              accountSize={accountSize} riskPct={riskPct} />
           ))}
         </div>
       ) : (
@@ -1440,7 +1478,8 @@ export default function Page() {
                 <ScanRow key={r.ticker} row={r} rank={i + 1} watchlist={watchlist} onWatch={toggleWatch} usdJpy={usdJpy} onEnrich={openEnrich}
                   isWatchTab={tab === 'watchlist'} buyingTicker={buyingTicker} onBuyToggle={handleBuyToggle}
                   buyForm={buyForm} onBuyFormChange={(f, v) => setBuyForm(p => ({ ...p, [f]: v }))}
-                  onBuySubmit={r => addToPortfolio(r, buyForm.avgCost, buyForm.shares)} />
+                  onBuySubmit={r => addToPortfolio(r, buyForm.avgCost, buyForm.shares)}
+                  accountSize={accountSize} riskPct={riskPct} />
               ))}
             </tbody>
           </table>

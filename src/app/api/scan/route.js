@@ -396,8 +396,31 @@ export async function POST() {
       row.islandReversal = isIslandReversal(ohlc);
       if (ohlc && ohlc.length >= 2) {
         if (qqqFactor != null && qqqFactor > 0) {
-          const stockFactor = ohlc.at(-1).close / ohlc[0].close;
-          row.rs = Math.round((stockFactor / qqqFactor) * 100) / 100;
+          const len = ohlc.length;
+          const qLen = qqqChart.length;
+          const last = ohlc.at(-1).close;
+          const qLast = qqqChart.at(-1).close;
+          const periods = [
+            { frac: 3/12, w: 0.4 },
+            { frac: 6/12, w: 0.2 },
+            { frac: 9/12, w: 0.2 },
+            { frac: 12/12, w: 0.2 },
+          ];
+          let rsSum = 0, totalWeight = 0;
+          for (const { frac, w } of periods) {
+            const si = len - Math.round(len * frac);
+            const qi = qLen - Math.round(qLen * frac);
+            if (si < 0 || qi < 0 || si >= len || qi >= qLen) continue;
+            const base = ohlc[si]?.close;
+            const qBase = qqqChart[qi]?.close;
+            if (!base || !qBase || base <= 0 || qBase <= 0) continue;
+            const ratio = (last / base) / (qLast / qBase);
+            rsSum += ratio * w;
+            totalWeight += w;
+          }
+          if (totalWeight > 0) {
+            row.rs = Math.round((rsSum / totalWeight) * 100) / 100;
+          }
         }
         const nearHighThreshold = row.week52High * 0.98;
         for (let j = ohlc.length - 1; j >= 0; j--) {
@@ -433,8 +456,10 @@ export async function POST() {
     const qqqClose = qqqChart?.at(-1)?.close ?? null;
     const bearMarket = qqqMa200 != null && qqqClose != null && qqqClose < qqqMa200;
 
-    rows.sort((a, b) => b.score - a.score);
-    const capped = applySectorCap(rows);
+    const scoreThreshold = bearMarket ? 65 : 50;
+    const qualifiedRows = rows.filter(r => r.score >= scoreThreshold);
+    qualifiedRows.sort((a, b) => b.score - a.score);
+    const capped = applySectorCap(qualifiedRows);
 
     // ブレイクアウト銘柄があればメール通知（fire-and-forget）
     const breakouts = capped.filter(r => r.trendMode === 'breakout');
